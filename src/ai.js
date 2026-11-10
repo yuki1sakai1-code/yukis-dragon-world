@@ -138,8 +138,14 @@ function minimax(chess, depth, alpha, beta, maximizingPlayer) {
   }
 }
 
-export function chooseBestMove(chess, depth = 2) {
-  const moves = orderMoves(chess.moves({ verbose: true }));
+export function chooseBestMove(chess, depth = 2, isMoveForbidden = null) {
+  let moves = orderMoves(chess.moves({ verbose: true }));
+  if (isMoveForbidden) {
+    const validMoves = moves.filter((m) => !isMoveForbidden(m));
+    if (validMoves.length > 0) {
+      moves = validMoves;
+    }
+  }
   if (moves.length === 0) return null;
 
   const isWhite = chess.turn() === 'w';

@@ -43,7 +43,7 @@
       <div class="loading-bar-outer">
         <div id="loading-bar-fill" class="loading-bar-fill"></div>
       </div>
-      <p id="loading-status" class="loading-status">6種の石造ドラゴン群と古代ルーン祭壇を召喚中...</p>
+      <p id="loading-status" class="loading-status">ドラゴンたちを呼び覚まし中...</p>
     </div>
   </div>
 
@@ -80,6 +80,13 @@
 
       <!-- Top Right Sanctum Controls -->
       <div class="top-controls">
+        <div class="control-group">
+          <label for="combat-rule-select">対戦モード (Battle Mode)</label>
+          <select id="combat-rule-select" class="gothic-select">
+            <option value="tactics" selected>⚔️ 竜石タクティクス (HP/攻/防)</option>
+            <option value="classic">♟️ ワンショットバトル (一撃必殺)</option>
+          </select>
+        </div>
         <div class="control-group">
           <label for="game-mode-select">聖域決戦モード</label>
           <select id="game-mode-select" class="gothic-select">
@@ -174,9 +181,9 @@
       <div class="panel-section">
         <div class="section-header">
           <h2>🎥 聖域カメラ視点</h2>
-          <label class="cinematic-toggle" title="竜のブレス・激突時に迫力の戦闘カメラへ自動遷移">
+          <label class="cinematic-toggle" title="竜のブレス・交戦時に自動で迫力拡大するか、俯瞰・現在視点を維持するか">
             <input type="checkbox" id="chk-action-cam" checked />
-            <span>激突カメラ</span>
+            <span>拡大演出</span>
           </label>
         </div>
         <div class="camera-grid">
@@ -185,6 +192,59 @@
           <button class="gothic-btn cam-btn" data-cam="overhead">魔法陣祭壇・俯瞰</button>
           <button class="gothic-btn cam-btn" data-cam="cathedral">ゴシック大聖堂全景</button>
           <button class="gothic-btn cam-btn full-width" data-cam="closeup" id="btn-cam-closeup">🔍 石造ドラゴン解剖マクロ鑑賞</button>
+        </div>
+
+        <!-- 攻撃演出カメラ設定 (Combat Camera Setting) -->
+        <div class="control-group" style="margin-top: 8px;">
+          <label for="combat-cam-select" style="font-size: 0.74rem; color: var(--bronze-bright); display: flex; justify-content: space-between; align-items: center;">
+            <span>🎬 攻撃時のカメラ演出 (Combat Camera)</span>
+          </label>
+          <select id="combat-cam-select" class="gothic-select full-width" title="攻撃モーション時のカメラ演出：画面を離して俯瞰している時は視点を維持するか、常に拡大するかを設定">
+            <option value="smart" selected>🔭 俯瞰時は視点維持 (引いている時は拡大なし)</option>
+            <option value="closeup">⚔️ 常に迫力拡大 (激突クローズアップ)</option>
+            <option value="free">🛡️ 常に現在視点を維持 (ズーム拡大なし)</option>
+          </select>
+        </div>
+        <div class="combat-cam-btn-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 5px;">
+          <button type="button" id="btn-cam-smart" class="gothic-btn active" style="font-size: 0.65rem; padding: 4px 2px;" title="スクロール等で画面を離して俯瞰している時は拡大せず、その俯瞰視点のまま火炎ブレスを鑑賞">🔭 俯瞰優先</button>
+          <button type="button" id="btn-cam-closeup-mode" class="gothic-btn" style="font-size: 0.65rem; padding: 4px 2px;" title="常に攻撃地点へクローズアップ拡大">⚔️ 常に拡大</button>
+          <button type="button" id="btn-cam-free" class="gothic-btn" style="font-size: 0.65rem; padding: 4px 2px;" title="どんな時もカメラを一切動かさず現在の視点をキープ">🛡️ 拡大なし</button>
+        </div>
+      </div>
+
+      <!-- Battle Mode Setting (Change Battle Mode) -->
+      <div class="panel-section">
+        <div class="section-header">
+          <h2>⚔️ 対戦モード設定 (Change Battle Mode)</h2>
+        </div>
+        <div class="control-group" style="margin-top: 5px;">
+          <select id="battle-mode-select" class="gothic-select full-width" title="対戦ルールの切替 (ワンショットバトル vs HP/攻撃/防御タクティクス)">
+            <option value="tactics" selected>⚔️ 竜石タクティクス (HP/攻撃/防御バトル)</option>
+            <option value="classic">♟️ ワンショットバトル (一撃必殺)</option>
+          </select>
+        </div>
+        <div class="battle-mode-btn-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px;">
+          <button type="button" id="btn-mode-tactics" class="gothic-btn active" style="font-size: 0.72rem; padding: 6px 4px; white-space: nowrap;" title="HP・攻撃力・防御力を参照する本格タクティクスバトル">
+            ⚔️ HP・攻防バトル
+          </button>
+          <button type="button" id="btn-mode-classic" class="gothic-btn" style="font-size: 0.72rem; padding: 6px 4px; white-space: nowrap;" title="ワンショットバトル（一撃必殺・HPバー非表示）">
+            ♟️ ワンショットバトル
+          </button>
+        </div>
+
+        <!-- 聖域崩落（フィールド収縮）インジケーター -->
+        <div id="cataclysm-status-box" style="margin-top: 8px; padding: 6px 10px; background: rgba(26, 12, 10, 0.65); border: 1px solid rgba(255, 68, 0, 0.4); border-radius: 4px; font-size: 0.72rem;" title="交戦が往復10ターン発生しない毎に外周マスが赤黒く崩落し、逃げ場が狭まります">
+          <div style="display: flex; justify-content: space-between; align-items: center; color: #ff8855;">
+            <span>🌋 聖域崩落タイマー</span>
+            <span id="cataclysm-phase-badge" style="color: var(--text-ash);">通常 (7x7)</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 3px; color: var(--text-limestone);">
+            <span>交戦なし経過:</span>
+            <span id="cataclysm-turns-text" style="font-weight: bold; color: #ffaa44;">0 / 10 ターン (残り 10)</span>
+          </div>
+          <div style="width: 100%; height: 4px; background: rgba(0,0,0,0.6); border-radius: 2px; overflow: hidden; margin-top: 4px;">
+            <div id="cataclysm-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ff9900, #ff2200); transition: width 0.3s ease;"></div>
+          </div>
         </div>
       </div>
 
@@ -257,6 +317,26 @@
               <span class="stat-val" id="inspector-bones">7 Bones</span>
             </div>
           </div>
+          <!-- Draconic Battle RPG Stats (HP / ATK / DEF) -->
+          <div class="dragon-rpg-stats" id="inspector-rpg-stats" style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(200, 160, 90, 0.4); border-radius: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="font-size: 11px; font-weight: 700; color: #e8d8b8; letter-spacing: 0.05em;">生命力 (HP)</span>
+              <span id="inspector-hp-text" style="font-size: 11px; font-family: 'JetBrains Mono', monospace; color: #ff6b6b; font-weight: 700;">— / —</span>
+            </div>
+            <div style="width: 100%; height: 7px; background: #1a1612; border-radius: 3px; overflow: hidden; border: 1px solid #4a3c26;">
+              <div id="inspector-hp-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #e74c3c, #2ecc71); transition: width 0.3s ease;"></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;">
+              <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
+                <span style="color: #f39c12; font-weight: 700;">⚔️ 攻撃力:</span>
+                <span id="inspector-atk-val" style="font-family: 'JetBrains Mono', monospace; color: #fff; font-weight: 700;">—</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px; font-size: 11px;">
+                <span style="color: #3498db; font-weight: 700;">🛡️ 防御力:</span>
+                <span id="inspector-def-val" style="font-family: 'JetBrains Mono', monospace; color: #fff; font-weight: 700;">—</span>
+              </div>
+            </div>
+          </div>
           <div class="anim-preview-bar" title="Blender 5.2 NLA 石造ドラゴン骨格モーション再生">
             <button type="button" class="gothic-btn anim-test-btn" data-anim="Idle">咆哮待機</button>
             <button type="button" class="gothic-btn anim-test-btn" data-anim="Move">飛翔進撃</button>
@@ -286,6 +366,9 @@
           <button id="btn-undo" class="gothic-btn">↩️ 時を戻す</button>
           <button id="btn-hint" class="gothic-btn">🔮 古竜の神託</button>
           <button id="btn-clear-debris" class="gothic-btn">🧹 砕石を浄化</button>
+          <button id="btn-cataclysm-demo" class="gothic-btn full-width" style="grid-column: span 2; margin-top: 4px; border-color: rgba(255, 68, 0, 0.65); color: #ff7744;" title="聖域の魔力暴走による外周マス崩落ギミックを発動">
+            🌋 聖域崩落を発動 (Cataclysm)
+          </button>
         </div>
       </div>
 

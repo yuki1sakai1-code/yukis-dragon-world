@@ -21,6 +21,117 @@ export const SCENARIOS = {
   endgame: '1r1k3/4b2/p1np1q1/7/1Q1PN1P/2B4/3K1R1 w - - 0 1'
 };
 
+export const DRAGON_STATS = {
+  p: { maxHp: 20, atk: 25, def: 10, headHeight: 1.15, title: '幼竜ドレイク' },
+  n: { maxHp: 45, atk: 40, def: 18, headHeight: 1.55, title: '双翼ワイバーン' },
+  b: { maxHp: 40, atk: 45, def: 15, headHeight: 1.65, title: '双頭の秘術竜ヒドラ' },
+  r: { maxHp: 80, atk: 55, def: 35, headHeight: 1.35, title: '要塞重装鎧地竜' },
+  q: { maxHp: 90, atk: 70, def: 25, headHeight: 1.85, title: '四翼の飛翔女帝竜' },
+  k: { maxHp: 100, atk: 50, def: 40, headHeight: 2.10, title: '聖堂の覇王古竜' }
+};
+
+function createHpBarSprite(maxHp, currentHp) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 28;
+  const ctx = canvas.getContext('2d');
+
+  function draw(hp) {
+    ctx.clearRect(0, 0, 128, 28);
+    // Outer border (Gothic Dark Gold)
+    ctx.fillStyle = 'rgba(18, 14, 10, 0.88)';
+    ctx.fillRect(2, 2, 124, 24);
+    ctx.strokeStyle = '#c5a059';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(2, 2, 124, 24);
+
+    // HP Bar Fill
+    const ratio = Math.max(0, Math.min(1, hp / maxHp));
+    const barW = Math.floor(116 * ratio);
+    if (barW > 0) {
+      const grad = ctx.createLinearGradient(6, 0, 122, 0);
+      if (ratio > 0.5) {
+        grad.addColorStop(0, '#27ae60');
+        grad.addColorStop(1, '#2ecc71');
+      } else if (ratio > 0.25) {
+        grad.addColorStop(0, '#e67e22');
+        grad.addColorStop(1, '#f1c40f');
+      } else {
+        grad.addColorStop(0, '#c0392b');
+        grad.addColorStop(1, '#e74c3c');
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(6, 6, barW, 16);
+    }
+
+    // Text: e.g. "30/30"
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#000000';
+    ctx.shadowBlur = 4;
+    ctx.fillText(`${hp}/${maxHp}`, 64, 14);
+  }
+
+  draw(currentHp);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.68, 0.15, 1.0);
+  sprite.userData = { canvas, ctx, texture, draw };
+  return sprite;
+}
+
+function createDamageNumberSprite(damage) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 80;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 160, 80);
+
+  const isBlocked = damage <= 0;
+  const text = isBlocked ? 'BLOCK 0' : `-${damage}`;
+  ctx.font = 'bold 30px "Cinzel", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 6;
+  ctx.strokeText(text, 80, 40);
+
+  const grad = ctx.createLinearGradient(0, 15, 0, 65);
+  if (isBlocked) {
+    grad.addColorStop(0, '#e0e0e0');
+    grad.addColorStop(0.5, '#90caf9');
+    grad.addColorStop(1, '#1976d2');
+  } else {
+    grad.addColorStop(0, '#ffcdd2');
+    grad.addColorStop(0.5, '#f44336');
+    grad.addColorStop(1, '#b71c1c');
+  }
+  ctx.fillStyle = grad;
+  ctx.fillText(text, 80, 40);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const mat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.8, 0.4, 1.0);
+  return sprite;
+}
+
 const PIECE_INFO = {
   p: {
     name: '幼竜ドレイク (Stone Hatchling Drake)',
@@ -82,6 +193,7 @@ class WizardsChessApp {
     this.gameMode = 'pva'; // 'pva' | 'pvp' | 'ava'
     this.aiDepth = 2;
     this.actionCamEnabled = true;
+    this.combatCamMode = 'smart'; // 'smart' (俯瞰・離れている時は視点維持) | 'closeup' (常に拡大) | 'free' (常に現在視点維持/拡大なし)
     this.isBusy = false;
     this.selectedSquare = null;
     this.legalMovesForSelected = [];
@@ -160,6 +272,13 @@ class WizardsChessApp {
     this.pieceInstances = new Map();
     this.activeMixers = new Set();
     this.pedestalMode = 'no-base';
+    this.combatRule = 'tactics';
+    this.damagePopups = [];
+    this._kingSlain = null;
+    this.moveActionLog = [];
+    this.collapsedSquares = new Set();
+    this.cataclysmPhase = 0;
+    this.peacefulHalfMoves = 0;
     this.chess.load(SCENARIOS.endgame);
 
     // VFX & Lighting
@@ -434,6 +553,220 @@ class WizardsChessApp {
       const yOffset = hasBase ? 0 : -bodyMinY;
       instance.yOffset = yOffset;
       instance.root.position.y = basePos.y + yOffset;
+    }
+  }
+
+  setCombatRule(rule) {
+    this.combatRule = rule;
+    const isTactics = rule === 'tactics';
+
+    // Synchronize both top and side panel select elements
+    const selectTop = document.getElementById('combat-rule-select');
+    if (selectTop && selectTop.value !== rule) selectTop.value = rule;
+    const selectSide = document.getElementById('battle-mode-select');
+    if (selectSide && selectSide.value !== rule) selectSide.value = rule;
+
+    // Synchronize toggle buttons
+    const btnTactics = document.getElementById('btn-mode-tactics');
+    const btnClassic = document.getElementById('btn-mode-classic');
+    if (btnTactics) btnTactics.classList.toggle('active', isTactics);
+    if (btnClassic) btnClassic.classList.toggle('active', !isTactics);
+
+    // Show or hide 3D HP bar sprites on each piece
+    for (const inst of this.pieceInstances.values()) {
+      if (inst.hpBarSprite) {
+        inst.hpBarSprite.visible = isTactics;
+      }
+    }
+
+    // Toggle inspector RPG stats section
+    const rpgStats = document.getElementById('inspector-rpg-stats');
+    if (rpgStats) {
+      rpgStats.style.display = isTactics ? 'block' : 'none';
+    }
+
+    const toast = document.getElementById('status-toast');
+    if (toast) {
+      toast.textContent = isTactics
+        ? '⚔️ 対戦モード: 竜石タクティクス (HP/攻撃/防御バトル) に切り替えました'
+        : '♟️ 対戦モード: ワンショットバトル (一撃必殺・通常ルール) に切り替えました';
+    }
+  }
+
+  _spawnDamageNumber(worldPos, damage) {
+    const sprite = createDamageNumberSprite(damage);
+    sprite.position.copy(worldPos);
+    sprite.position.y += 1.85;
+    this.scene.add(sprite);
+    this.damagePopups.push({
+      sprite,
+      elapsed: 0,
+      maxLife: 1.1,
+      startPos: sprite.position.clone()
+    });
+  }
+
+  _isRepetitionForbidden(move) {
+    if (!move || !move.from || !move.to) return false;
+    const playerHistory = this.moveActionLog.filter((m) => m.color === move.color);
+    if (playerHistory.length < 2) return false;
+
+    // パターン1: 同じマスへの突撃・弾かれ後退を繰り返す千日手
+    // 直近2回連続で同一の from -> to を実行しており、今回も同じ手を指そうとしたら3回目で禁止
+    const last1 = playerHistory[playerHistory.length - 1];
+    const last2 = playerHistory[playerHistory.length - 2];
+    if (
+      last1 && last2 &&
+      last1.from === move.from && last1.to === move.to &&
+      last2.from === move.from && last2.to === move.to
+    ) {
+      return true;
+    }
+
+    // パターン2: 通常移動で同じ2マス間を行き来する千日手 (A -> B -> A -> B -> A -> B の3回目)
+    if (playerHistory.length >= 4) {
+      const h1 = playerHistory[playerHistory.length - 1];
+      const h2 = playerHistory[playerHistory.length - 2];
+      const h3 = playerHistory[playerHistory.length - 3];
+      const h4 = playerHistory[playerHistory.length - 4];
+      if (
+        h1.from === move.to && h1.to === move.from &&
+        h2.from === move.from && h2.to === move.to &&
+        h3.from === move.to && h3.to === move.from &&
+        h4.from === move.from && h4.to === move.to
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  async triggerCataclysm(forcePhase = null) {
+    if (this.isBusy) return;
+    const targetPhase = forcePhase !== null ? forcePhase : this.cataclysmPhase + 1;
+    if (targetPhase > 3) {
+      const toast = document.getElementById('status-toast');
+      if (toast) toast.textContent = '🌋 聖域はすでに十字5マスの最終決戦領域まで崩落しています！';
+      return;
+    }
+
+    this.isBusy = true;
+    this.cataclysmPhase = targetPhase;
+
+    const squaresToCollapse = [];
+    if (targetPhase === 1) {
+      for (let r = 1; r <= 7; r++) {
+        squaresToCollapse.push(`a${r}`, `g${r}`);
+      }
+      for (const f of ['b', 'c', 'd', 'e', 'f']) {
+        squaresToCollapse.push(`${f}1`, `${f}7`);
+      }
+    } else if (targetPhase === 2) {
+      for (let r = 2; r <= 6; r++) {
+        squaresToCollapse.push(`b${r}`, `f${r}`);
+      }
+      for (const f of ['c', 'd', 'e']) {
+        squaresToCollapse.push(`${f}2`, `${f}6`);
+      }
+    } else if (targetPhase === 3) {
+      // 3x3の四隅が崩落し、十字5マス (c4, d4, e4, d3, d5) に収縮！
+      squaresToCollapse.push('c3', 'c5', 'e3', 'e5');
+    }
+
+    const toast = document.getElementById('status-toast');
+    if (toast) {
+      toast.textContent = `🌋 聖域崩壊 (Cataclysm Phase ${targetPhase}) 発動！ 外周石畳が崩落し足場が奪われます！`;
+    }
+    this.sfx.playCheckHorn();
+
+    // 1. Flash collapsing squares in red
+    for (const sq of squaresToCollapse) {
+      this.collapsedSquares.add(sq);
+      const ov = this.squareOverlays.get(sq);
+      if (ov) {
+        ov.material.color.setHex(0xff2200);
+        ov.material.opacity = 0.85;
+      }
+    }
+
+    await this._wait(650);
+    this.sfx.playSwordStrikeAndShatter();
+
+    // 2. Any dragons standing on collapsing squares plunge into the void
+    for (const sq of squaresToCollapse) {
+      const inst = this.pieceInstances.get(sq);
+      if (inst) {
+        const victimPos = this.squareToWorld(sq);
+        this.vfx.spawnShatterExplosion(
+          victimPos,
+          this._getPieceMaterial(inst.type, inst.color),
+          inst.color === 'w'
+        );
+        this._removePieceInstance(sq);
+
+        const coords = this.chess._squareToCoords(sq);
+        this.chess._board[coords.r][coords.c] = null;
+
+        if (inst.type === 'k') {
+          this._kingSlain = inst.color;
+        }
+
+        const feed = document.getElementById('combat-feed');
+        if (feed) {
+          const div = document.createElement('div');
+          div.className = 'combat-entry';
+          div.textContent = `🌋 聖域崩落！ ${inst.color === 'w' ? '白竜石' : '黒曜竜'}の${PIECE_INFO[inst.type]?.shortName || '石造竜'}が足場を失い奈落へ消滅！ (${sq.toUpperCase()})`;
+          feed.prepend(div);
+        }
+      }
+
+      const ov = this.squareOverlays.get(sq);
+      if (ov) {
+        ov.material.color.setHex(0x150808);
+        ov.material.opacity = 0.95;
+      }
+    }
+
+    this._updateBoardHighlights();
+    this.updateHUD();
+    this._updateCataclysmHUD();
+    this.isBusy = false;
+
+    if (this._kingSlain) {
+      const victor = this._kingSlain === 'w' ? '黒曜竜の眷属 (Obsidian Brood)' : '白竜石の聖堂群 (Alabaster Brood)';
+      this._showGameOverModal(`聖域崩落により覇王古竜が奈落へ堕ちました！ ${victor} の完全勝利！`);
+    }
+  }
+
+  _updateCataclysmHUD() {
+    const phaseBadge = document.getElementById('cataclysm-phase-badge');
+    const turnsText = document.getElementById('cataclysm-turns-text');
+    const bar = document.getElementById('cataclysm-progress-bar');
+
+    const peacefulFullMoves = Math.floor((this.peacefulHalfMoves || 0) / 2);
+    const turnsRemaining = Math.max(0, 10 - peacefulFullMoves);
+
+    if (phaseBadge) {
+      if (this.cataclysmPhase === 0) phaseBadge.textContent = '通常 (7x7)';
+      else if (this.cataclysmPhase === 1) phaseBadge.textContent = '第1崩落 (5x5)';
+      else if (this.cataclysmPhase === 2) phaseBadge.textContent = '第2崩落 (3x3)';
+      else phaseBadge.textContent = '最終決戦 (十字5マス)';
+    }
+
+    if (turnsText) {
+      if (this.cataclysmPhase >= 3) {
+        turnsText.textContent = '最大縮小到達';
+        turnsText.style.color = '#ff5533';
+      } else {
+        turnsText.textContent = `${peacefulFullMoves} / 10 ターン (残り ${turnsRemaining})`;
+        turnsText.style.color = turnsRemaining <= 3 ? '#ff3311' : '#ffaa44';
+      }
+    }
+
+    if (bar) {
+      const pct = this.cataclysmPhase >= 3 ? 100 : Math.min(100, (peacefulFullMoves / 10) * 100);
+      bar.style.width = `${pct}%`;
     }
   }
 
@@ -1029,6 +1362,14 @@ class WizardsChessApp {
 
     this.activeMixers.add(mixer);
 
+    // Draconic RPG Stats & Overhead HP Bar Sprite
+    const stats = DRAGON_STATS[type] || { maxHp: 50, atk: 25, def: 10, headHeight: 1.5, title: '石造竜' };
+    const hpBarSprite = createHpBarSprite(stats.maxHp, stats.maxHp);
+    const spriteY = stats.headHeight * scale + (hasBase ? 0.12 : scaledBodyMinY + 0.12);
+    hpBarSprite.position.set(0, spriteY, 0);
+    hpBarSprite.visible = this.combatRule === 'tactics';
+    clonedScene.add(hpBarSprite);
+
     const instance = {
       type,
       color,
@@ -1041,7 +1382,22 @@ class WizardsChessApp {
       defaultYaw,
       scale,
       yOffset,
-      bodyMinY: scaledBodyMinY
+      bodyMinY: scaledBodyMinY,
+      maxHp: stats.maxHp,
+      hp: stats.maxHp,
+      atk: stats.atk,
+      def: stats.def,
+      headHeight: stats.headHeight,
+      hpBarSprite,
+      updateHp(newHp) {
+        this.hp = Math.max(0, Math.min(this.maxHp, newHp));
+        if (this.hpBarSprite && this.hpBarSprite.userData?.draw) {
+          this.hpBarSprite.userData.draw(this.hp);
+          if (this.hpBarSprite.material.map) {
+            this.hpBarSprite.material.map.needsUpdate = true;
+          }
+        }
+      }
     };
 
     this._playPieceAnimation(instance, 'Idle', true);
@@ -1177,6 +1533,24 @@ class WizardsChessApp {
         this.executeMove(matchingMoves[0]);
         return;
       }
+
+      // Check if this move is blocked due to 3-repetition anti-stalemate rule
+      const rawMoves = this.chess.moves({ square: this.selectedSquare, verbose: true });
+      const blockedByRepetition = rawMoves.some((m) => m.to === square && this._isRepetitionForbidden(m));
+      if (blockedByRepetition) {
+        const toast = document.getElementById('status-toast');
+        if (toast) {
+          toast.textContent = '🚫 聖域禁呪: 同一駒の進退・往復ループ（千日手）は3回以上禁止されています！別の手を指してください。';
+        }
+        this.sfx.playCheckHorn();
+        return;
+      }
+
+      if (this.collapsedSquares.has(square)) {
+        const toast = document.getElementById('status-toast');
+        if (toast) toast.textContent = '🚫 崩落した奈落のマスには侵入できません！';
+        return;
+      }
     }
 
     const inst = this.pieceInstances.get(square);
@@ -1184,7 +1558,9 @@ class WizardsChessApp {
       this._updateInspector(inst);
       if (inst.color === this.chess.turn()) {
         this.selectedSquare = square;
-        this.legalMovesForSelected = this.chess.moves({ square, verbose: true });
+        this.legalMovesForSelected = this.chess
+          .moves({ square, verbose: true })
+          .filter((m) => !this._isRepetitionForbidden(m) && !this.collapsedSquares.has(m.to));
         this.sfx.playSelect();
         this._updateBoardHighlights();
         this._updateInspector(inst);
@@ -1218,6 +1594,47 @@ class WizardsChessApp {
     this._tweenCamera(camPos, lookTarget, 0.72);
   }
 
+  setCombatCamMode(mode) {
+    if (!['smart', 'closeup', 'free'].includes(mode)) return;
+    this.combatCamMode = mode;
+    this.actionCamEnabled = mode !== 'free';
+
+    const select = document.getElementById('combat-cam-select');
+    if (select) select.value = mode;
+
+    const btnSmart = document.getElementById('btn-cam-smart');
+    const btnCloseup = document.getElementById('btn-cam-closeup-mode');
+    const btnFree = document.getElementById('btn-cam-free');
+    if (btnSmart) btnSmart.classList.toggle('active', mode === 'smart');
+    if (btnCloseup) btnCloseup.classList.toggle('active', mode === 'closeup');
+    if (btnFree) btnFree.classList.toggle('active', mode === 'free');
+
+    const chk = document.getElementById('chk-action-cam');
+    if (chk) chk.checked = mode !== 'free';
+
+    const toast = document.getElementById('status-toast');
+    if (toast) {
+      if (mode === 'smart') toast.textContent = '🎬 攻撃カメラ: 俯瞰時は視点維持 (引いている時は拡大せずそのままブレス鑑賞)';
+      else if (mode === 'closeup') toast.textContent = '🎬 攻撃カメラ: 常に迫力拡大 (激突クローズアップ)';
+      else if (mode === 'free') toast.textContent = '🎬 攻撃カメラ: 常に現在視点を維持 (ズーム拡大なし)';
+    }
+  }
+
+  _isOverviewingCamera() {
+    if (!this.camera || !this.controls) return false;
+    const target = this.controls.target || new THREE.Vector3(0, 0.65, 0);
+    const dist = this.camera.position.distanceTo(target);
+    const deltaY = this.camera.position.y - target.y;
+
+    // 1. スクロール等で画面を離している場合 (標準岩座視点の距離は約13.8)
+    const isFar = dist >= 14.2;
+
+    // 2. 俯瞰（見下ろし角が高い）場合 (魔法陣祭壇・俯瞰プリセット等)
+    const isHighAngle = (dist > 0.1 && deltaY / dist >= 0.58) || deltaY >= 9.5;
+
+    return isFar || isHighAngle;
+  }
+
   _resetInspector() {
     const feed = document.getElementById('combat-feed');
     if (feed) {
@@ -1239,6 +1656,18 @@ class WizardsChessApp {
     if (movesEl) movesEl.textContent = '0';
     if (bonesEl) bonesEl.textContent = '7 Bones';
     if (pillEl) pillEl.textContent = 'IDLE';
+
+    const hpText = document.getElementById('inspector-hp-text');
+    const hpBar = document.getElementById('inspector-hp-bar');
+    const atkVal = document.getElementById('inspector-atk-val');
+    const defVal = document.getElementById('inspector-def-val');
+    if (hpText) hpText.textContent = '— / —';
+    if (hpBar) {
+      hpBar.style.width = '100%';
+      hpBar.style.background = 'linear-gradient(90deg, #27ae60, #2ecc71)';
+    }
+    if (atkVal) atkVal.textContent = '—';
+    if (defVal) defVal.textContent = '—';
   }
 
   _updateInspector(inst) {
@@ -1259,6 +1688,27 @@ class WizardsChessApp {
     if (movesEl) movesEl.textContent = `${moves.length}`;
     if (bonesEl) bonesEl.textContent = `${inst.boneCount} Bones`;
     if (pillEl) pillEl.textContent = inst.currentAnim.toUpperCase();
+
+    const hpText = document.getElementById('inspector-hp-text');
+    const hpBar = document.getElementById('inspector-hp-bar');
+    const atkVal = document.getElementById('inspector-atk-val');
+    const defVal = document.getElementById('inspector-def-val');
+    if (inst.hp !== undefined && inst.maxHp !== undefined) {
+      if (hpText) hpText.textContent = `${inst.hp} / ${inst.maxHp}`;
+      if (hpBar) {
+        const pct = Math.max(0, Math.min(100, Math.round((inst.hp / inst.maxHp) * 100)));
+        hpBar.style.width = `${pct}%`;
+        if (pct > 50) {
+          hpBar.style.background = 'linear-gradient(90deg, #27ae60, #2ecc71)';
+        } else if (pct > 25) {
+          hpBar.style.background = 'linear-gradient(90deg, #e67e22, #f1c40f)';
+        } else {
+          hpBar.style.background = 'linear-gradient(90deg, #c0392b, #e74c3c)';
+        }
+      }
+      if (atkVal) atkVal.textContent = `${inst.atk}`;
+      if (defVal) defVal.textContent = `${inst.def}`;
+    }
   }
 
   async executeMove(moveInput) {
@@ -1271,6 +1721,26 @@ class WizardsChessApp {
       return false;
     }
     if (!moveObj) return false;
+
+    // Check anti-stalemate 3-repetition rule
+    if (this._isRepetitionForbidden(moveObj)) {
+      this.chess.undo();
+      const toast = document.getElementById('status-toast');
+      if (toast) {
+        toast.textContent = '🚫 聖域禁呪: 同一駒の進退・往復ループ（千日手）は3回以上禁止されています！別の手を指してください。';
+      }
+      this.sfx.playCheckHorn();
+      return false;
+    }
+
+    // Check collapsed abyss square
+    if (this.collapsedSquares.has(moveObj.to)) {
+      this.chess.undo();
+      const toast = document.getElementById('status-toast');
+      if (toast) toast.textContent = '🚫 崩落した奈落のマスには侵入できません！';
+      this.sfx.playCheckHorn();
+      return false;
+    }
 
     this.isBusy = true;
     this.hintMove = null;
@@ -1287,41 +1757,47 @@ class WizardsChessApp {
     }
     const defender = moveObj.captured ? this.pieceInstances.get(capturedSquare) : null;
 
+    let combatOutcome = null;
+
     if (attacker) {
-      await this._animateMoveAndCombat(attacker, defender, moveObj, capturedSquare);
+      combatOutcome = await this._animateMoveAndCombat(attacker, defender, moveObj, capturedSquare);
     } else {
       this.syncBoardFromFEN();
     }
 
-    // Castling Rook motion (if ever triggered)
-    if (moveObj.flags && (moveObj.flags.includes('k') || moveObj.flags.includes('q'))) {
-      const rank = moveObj.color === 'w' ? '1' : '7';
-      const rookFrom = moveObj.flags.includes('k') ? `g${rank}` : `a${rank}`;
-      const rookTo = moveObj.flags.includes('k') ? `e${rank}` : `c${rank}`;
-      const rookInst = this.pieceInstances.get(rookFrom);
-      if (rookInst) {
-        this.pieceInstances.delete(rookFrom);
-        rookInst.square = rookTo;
-        const rookPos = this.squareToWorld(rookTo);
-        rookPos.y += (rookInst.yOffset || 0);
-        rookInst.root.position.copy(rookPos);
-        this.pieceInstances.set(rookTo, rookInst);
-      }
-    }
+    const survivedRepel = combatOutcome?.isCombat && !combatOutcome.destroyed;
 
-    // Pawn Promotion transfiguration
-    if (moveObj.promotion) {
-      this._removePieceInstance(moveObj.to);
-      const promoted = this._createPieceInstance(moveObj.promotion, moveObj.color, moveObj.to);
-      if (promoted) {
-        this.pieceInstances.set(moveObj.to, promoted);
-        const promoPos = this.squareToWorld(moveObj.to);
-        promoPos.y += (promoted.yOffset || 0);
-        this.vfx.spawnShatterExplosion(
-          promoPos,
-          this._getPieceMaterial(moveObj.promotion, moveObj.color),
-          moveObj.color === 'w'
-        );
+    if (!survivedRepel) {
+      // Castling Rook motion (if ever triggered)
+      if (moveObj.flags && (moveObj.flags.includes('k') || moveObj.flags.includes('q'))) {
+        const rank = moveObj.color === 'w' ? '1' : '7';
+        const rookFrom = moveObj.flags.includes('k') ? `g${rank}` : `a${rank}`;
+        const rookTo = moveObj.flags.includes('k') ? `e${rank}` : `c${rank}`;
+        const rookInst = this.pieceInstances.get(rookFrom);
+        if (rookInst) {
+          this.pieceInstances.delete(rookFrom);
+          rookInst.square = rookTo;
+          const rookPos = this.squareToWorld(rookTo);
+          rookPos.y += (rookInst.yOffset || 0);
+          rookInst.root.position.copy(rookPos);
+          this.pieceInstances.set(rookTo, rookInst);
+        }
+      }
+
+      // Pawn Promotion transfiguration
+      if (moveObj.promotion) {
+        this._removePieceInstance(moveObj.to);
+        const promoted = this._createPieceInstance(moveObj.promotion, moveObj.color, moveObj.to);
+        if (promoted) {
+          this.pieceInstances.set(moveObj.to, promoted);
+          const promoPos = this.squareToWorld(moveObj.to);
+          promoPos.y += (promoted.yOffset || 0);
+          this.vfx.spawnShatterExplosion(
+            promoPos,
+            this._getPieceMaterial(moveObj.promotion, moveObj.color),
+            moveObj.color === 'w'
+          );
+        }
       }
     }
 
@@ -1329,11 +1805,58 @@ class WizardsChessApp {
       this.sfx.playCheckHorn();
     }
 
-    this._logCombatMove(moveObj);
+    this.moveActionLog.push({
+      color: moveObj.color,
+      piece: moveObj.piece,
+      from: moveObj.from,
+      to: moveObj.to,
+      recoiled: Boolean(survivedRepel)
+    });
+
+    this._logCombatMove(moveObj, combatOutcome);
     this._updateBoardHighlights();
     this.updateHUD();
 
+    // お互いの戦闘が往復10ターン以上実行されない毎にフィールドを狭くしていって逃げ場を縮小！
+    const isCombat = Boolean(combatOutcome?.isCombat);
+    if (isCombat) {
+      // 交戦が発生: 聖域崩壊タイマーをリセット
+      const wasWarning = this.peacefulHalfMoves >= 14;
+      this.peacefulHalfMoves = 0;
+      if (wasWarning) {
+        const toast = document.getElementById('status-toast');
+        if (toast) toast.textContent = '🔥 ドラゴン交戦発生！ 聖域崩落カウントダウンがリセットされました！';
+      }
+    } else {
+      // 交戦なし移動: 半手を加算
+      this.peacefulHalfMoves++;
+    }
+
+    const peacefulFullMoves = Math.floor(this.peacefulHalfMoves / 2);
+    const turnsRemaining = Math.max(0, 10 - peacefulFullMoves);
+
+    // 往復10ターン（20手）交戦なし毎にフィールド崩落を発動
+    if (peacefulFullMoves >= 10 && this.cataclysmPhase < 3) {
+      this.peacefulHalfMoves = 0; // 次の縮小に向けてリセット
+      const nextPhase = this.cataclysmPhase + 1;
+      await this.triggerCataclysm(nextPhase);
+    } else if (this.cataclysmPhase < 3 && turnsRemaining <= 3 && turnsRemaining > 0 && this.peacefulHalfMoves % 2 === 0) {
+      // 残り3ターン以下の警告トースト (毎往復ターン表示)
+      const toast = document.getElementById('status-toast');
+      if (toast) {
+        toast.textContent = `⚠️ 警告: 交戦なし！ 残り ${turnsRemaining} ターンで聖域が崩落し盤面が縮小します！`;
+      }
+    }
+
+    this._updateCataclysmHUD();
+
     this.isBusy = false;
+
+    if (this._kingSlain) {
+      const victor = this._kingSlain === 'w' ? '黒曜竜の眷属 (Obsidian Brood)' : '白竜石の聖堂群 (Alabaster Brood)';
+      this._showGameOverModal(`竜石の聖域にて覇王古竜が討滅されました！ ${victor} の完全勝利！`);
+      return true;
+    }
 
     if (this.chess.isGameOver()) {
       this._showGameOverModal();
@@ -1364,7 +1887,20 @@ class WizardsChessApp {
       const stopDist = Math.max(0.18, distance - 0.96);
       const strikePos = startPos.clone().addScaledVector(dir, stopDist);
 
+      // 攻撃演出カメラ: 俯瞰・離れている時は視点維持、または設定に応じたクローズアップ
+      let triggerActionCam = false;
       if (this.actionCamEnabled) {
+        if (this.combatCamMode === 'closeup') {
+          triggerActionCam = true;
+        } else if (this.combatCamMode === 'free') {
+          triggerActionCam = false;
+        } else {
+          // 'smart' (デフォルト): スクロールで離している・俯瞰している時はズームせず視点を維持！
+          triggerActionCam = !this._isOverviewingCamera();
+        }
+      }
+
+      if (triggerActionCam) {
         this.savedCameraState = {
           pos: this.camera.position.clone(),
           target: this.controls.target.clone()
@@ -1376,6 +1912,8 @@ class WizardsChessApp {
           .add(new THREE.Vector3(0, 2.75, 0))
           .addScaledVector(dir, -1.35);
         this._tweenCamera(camPos, defenderPos.clone().add(new THREE.Vector3(0, 0.92, 0)), 0.42);
+      } else {
+        this.savedCameraState = null;
       }
 
       this._playPieceAnimation(attacker, 'Move', true);
@@ -1393,24 +1931,170 @@ class WizardsChessApp {
 
       this._playPieceAnimation(defender, 'Hit', false);
       this.sfx.playSwordStrikeAndShatter();
-      this.vfx.spawnShatterExplosion(
-        defenderPos,
-        this._getPieceMaterial(defender.type, defender.color),
-        defender.color === 'w'
-      );
 
-      await this._wait(260);
-      this._removePieceInstance(capturedSquare);
+      const isTactics = this.combatRule === 'tactics';
+      let destroyed = true;
+      let finalDamage = defender.maxHp;
 
-      this._playPieceAnimation(attacker, 'Move', true);
-      await this._tweenPosition(attacker.root, strikePos, targetPos, 0.28, false);
-      attacker.root.rotation.y = attacker.defaultYaw;
-      this._playPieceAnimation(attacker, 'Idle', true);
+      if (isTactics) {
+        // 攻撃側の攻撃力と、攻撃を受ける側の防御力で、攻撃力の上回った分だけHPが削られるシンプルな設計
+        const rawDiff = (attacker.atk || 0) - (defender.def || 0);
+        finalDamage = Math.max(0, rawDiff);
 
-      if (this.actionCamEnabled && this.savedCameraState) {
-        await this._wait(250);
-        this._tweenCamera(this.savedCameraState.pos, this.savedCameraState.target, 0.55);
-        this.savedCameraState = null;
+        const currentHp = defender.hp !== undefined ? defender.hp : defender.maxHp;
+        const newHp = Math.max(0, currentHp - finalDamage);
+        defender.updateHp(newHp);
+
+        this._spawnDamageNumber(defenderPos, finalDamage);
+        if (this.selectedSquare === capturedSquare) {
+          this._updateInspector(defender);
+        }
+
+        destroyed = newHp <= 0;
+      } else {
+        defender.updateHp(0);
+        this._spawnDamageNumber(defenderPos, defender.maxHp);
+        destroyed = true;
+      }
+
+      if (destroyed) {
+        this.vfx.spawnShatterExplosion(
+          defenderPos,
+          this._getPieceMaterial(defender.type, defender.color),
+          defender.color === 'w'
+        );
+
+        await this._wait(260);
+        this._removePieceInstance(capturedSquare);
+
+        this._playPieceAnimation(attacker, 'Move', true);
+        await this._tweenPosition(attacker.root, strikePos, targetPos, 0.28, false);
+        attacker.root.rotation.y = attacker.defaultYaw;
+        this._playPieceAnimation(attacker, 'Idle', true);
+
+        this.pieceInstances.delete(moveObj.from);
+        attacker.square = moveObj.to;
+        attacker.root.traverse((c) => {
+          if (c.isMesh) c.userData.square = moveObj.to;
+        });
+        this.pieceInstances.set(moveObj.to, attacker);
+
+        if (defender.type === 'k') {
+          this._kingSlain = defender.color;
+        }
+
+        if (this.savedCameraState) {
+          await this._wait(250);
+          this._tweenCamera(this.savedCameraState.pos, this.savedCameraState.target, 0.55);
+          this.savedCameraState = null;
+        }
+
+        return {
+          isCombat: true,
+          destroyed: true,
+          damage: finalDamage,
+          attackerAtk: attacker.atk,
+          defenderDef: defender.def,
+          victim: defender.type,
+          remainHp: 0,
+          maxHp: defender.maxHp
+        };
+      } else {
+        // Defender withstood the onslaught!
+        await this._wait(240);
+
+        let counterInfo = null;
+        let attackerDestroyed = false;
+
+        if (isTactics) {
+          // Counter-Attack: Defender unleashes furious retaliation!
+          const counterRaw = (defender.atk || 0) - (attacker.def || 0);
+          const counterDmg = Math.max(0, counterRaw);
+
+          defender.root.rotation.y = Math.atan2(toDef.x, toDef.z);
+          this._playPieceAnimation(defender, 'Attack', false);
+          await this._wait(170);
+          this.vfx.spawnDragonBreath(defenderPos, strikePos, defender.color === 'w');
+          await this._wait(220);
+
+          this._playPieceAnimation(attacker, 'Hit', false);
+          this.sfx.playSwordStrikeAndShatter();
+
+          const curAtkHp = attacker.hp !== undefined ? attacker.hp : attacker.maxHp;
+          const newAtkHp = Math.max(0, curAtkHp - counterDmg);
+          attacker.updateHp(newAtkHp);
+          this._spawnDamageNumber(strikePos, counterDmg);
+
+          attackerDestroyed = newAtkHp <= 0;
+          counterInfo = {
+            damage: counterDmg,
+            defenderAtk: defender.atk,
+            attackerDef: attacker.def,
+            attackerDestroyed,
+            attackerRemainHp: attacker.hp,
+            attackerMaxHp: attacker.maxHp
+          };
+
+          await this._wait(240);
+        }
+
+        defender.root.rotation.y = defender.defaultYaw;
+        this._playPieceAnimation(defender, 'Idle', true);
+
+        if (attackerDestroyed) {
+          // Attacker is shattered by the fierce counter-attack!
+          this.vfx.spawnShatterExplosion(
+            strikePos,
+            this._getPieceMaterial(attacker.type, attacker.color),
+            attacker.color === 'w'
+          );
+          await this._wait(260);
+          this._removePieceInstance(moveObj.from);
+
+          if (attacker.type === 'k') {
+            this._kingSlain = attacker.color;
+          }
+
+          // Undo move and remove attacker piece from chess engine board
+          this.chess.undo();
+          const fromCoords = this.chess._squareToCoords(moveObj.from);
+          this.chess._board[fromCoords.r][fromCoords.c] = null;
+          this.chess._turn = this.chess._turn === 'w' ? 'b' : 'w';
+          if (this.chess._turn === 'w') {
+            this.chess._fullMoves++;
+          }
+        } else {
+          // Attacker survives the counter-attack and retreats to original square
+          this._playPieceAnimation(attacker, 'Move', true);
+          await this._tweenPosition(attacker.root, strikePos, startPos, 0.32, false);
+          attacker.root.rotation.y = attacker.defaultYaw;
+          this._playPieceAnimation(attacker, 'Idle', true);
+
+          // Undo move in engine and hand turn over to opponent
+          this.chess.undo();
+          this.chess._turn = this.chess._turn === 'w' ? 'b' : 'w';
+          if (this.chess._turn === 'w') {
+            this.chess._fullMoves++;
+          }
+        }
+
+        if (this.savedCameraState) {
+          await this._wait(250);
+          this._tweenCamera(this.savedCameraState.pos, this.savedCameraState.target, 0.55);
+          this.savedCameraState = null;
+        }
+
+        return {
+          isCombat: true,
+          destroyed: false,
+          damage: finalDamage,
+          attackerAtk: attacker.atk,
+          defenderDef: defender.def,
+          victim: defender.type,
+          remainHp: defender.hp,
+          maxHp: defender.maxHp,
+          counter: counterInfo
+        };
       }
     } else {
       const dur = Math.min(0.75, Math.max(0.38, distance * 0.14));
@@ -1419,14 +2103,16 @@ class WizardsChessApp {
       await this._tweenPosition(attacker.root, startPos, targetPos, dur, attacker.type === 'n');
       attacker.root.rotation.y = attacker.defaultYaw;
       this._playPieceAnimation(attacker, 'Idle', true);
-    }
 
-    this.pieceInstances.delete(moveObj.from);
-    attacker.square = moveObj.to;
-    attacker.root.traverse((c) => {
-      if (c.isMesh) c.userData.square = moveObj.to;
-    });
-    this.pieceInstances.set(moveObj.to, attacker);
+      this.pieceInstances.delete(moveObj.from);
+      attacker.square = moveObj.to;
+      attacker.root.traverse((c) => {
+        if (c.isMesh) c.userData.square = moveObj.to;
+      });
+      this.pieceInstances.set(moveObj.to, attacker);
+
+      return { isCombat: false, destroyed: false };
+    }
   }
 
   _tweenPosition(obj, fromPos, toPos, durationSec, isJump = false) {
@@ -1474,7 +2160,8 @@ class WizardsChessApp {
     if (shouldAIMove) {
       setTimeout(() => {
         if (this.isBusy || this.chess.isGameOver()) return;
-        const aiMove = chooseBestMove(this.chess, this.aiDepth);
+        const isForbidden = (m) => this._isRepetitionForbidden(m) || this.collapsedSquares.has(m.to);
+        const aiMove = chooseBestMove(this.chess, this.aiDepth, isForbidden);
         if (aiMove) {
           this.executeMove(aiMove);
         }
@@ -1482,7 +2169,7 @@ class WizardsChessApp {
     }
   }
 
-  _logCombatMove(moveObj) {
+  _logCombatMove(moveObj, outcome = null) {
     const feed = document.getElementById('combat-feed');
     if (!feed) return;
 
@@ -1490,13 +2177,35 @@ class WizardsChessApp {
     const pieceTitle = PIECE_INFO[moveObj.piece]?.shortName || '石造竜';
     let msg = '';
 
-    if (moveObj.captured) {
+    if (outcome && outcome.isCombat) {
+      const victimTitle = PIECE_INFO[outcome.victim]?.shortName || '石造竜';
+      const atk = outcome.attackerAtk ?? '—';
+      const def = outcome.defenderDef ?? '—';
+      if (outcome.damage <= 0) {
+        msg = `🛡️ ${actorFaction}の${pieceTitle}(攻${atk})は ${moveObj.to.toUpperCase()} の${victimTitle}(防${def})の竜鱗に阻まれた！ (ダメージ: 0)`;
+      } else if (outcome.destroyed) {
+        msg = `🔥 ${actorFaction}の${pieceTitle}(攻${atk})が ${moveObj.to.toUpperCase()} の${victimTitle}(防${def})に ${outcome.damage} ダメージ！ 粉砕撃破！`;
+      } else {
+        msg = `⚔️ ${actorFaction}の${pieceTitle}(攻${atk})が ${moveObj.to.toUpperCase()} の${victimTitle}(防${def})に ${outcome.damage} ダメージ！ (耐えた！ 残りHP: ${outcome.remainHp}/${outcome.maxHp})`;
+      }
+
+      if (outcome.counter) {
+        const c = outcome.counter;
+        if (c.attackerDestroyed) {
+          msg += ` 💥反撃！ ${victimTitle}(攻${c.defenderAtk})が猛反撃し ${pieceTitle}(防${c.attackerDef})に ${c.damage} ダメージ — 攻撃側を返り討ち粉砕！`;
+        } else if (c.damage > 0) {
+          msg += ` 💥反撃！ ${victimTitle}(攻${c.defenderAtk})が反撃し ${pieceTitle}(防${c.attackerDef})に ${c.damage} ダメージ！ (残りHP: ${c.attackerRemainHp}/${c.attackerMaxHp})`;
+        } else {
+          msg += ` 🛡️反撃！ ${victimTitle}(攻${c.defenderAtk})の反撃は ${pieceTitle}(防${c.attackerDef})の装甲に阻まれた！ (ダメージ: 0)`;
+        }
+      }
+    } else if (moveObj.captured) {
       const victimTitle = PIECE_INFO[moveObj.captured]?.shortName || '石造竜';
       msg = `🔥 ${actorFaction}の${pieceTitle}が ${moveObj.to.toUpperCase()} の${victimTitle}を竜炎と牙で粉砕！ (${moveObj.san})`;
-    } else if (moveObj.san.includes('+')) {
+    } else if (moveObj.san && moveObj.san.includes('+')) {
       msg = `⚡ ${actorFaction}の${pieceTitle}が ${moveObj.to.toUpperCase()} へ飛来 — 覇王古竜に王手咆哮！`;
     } else {
-      msg = `⚔️ ${actorFaction}の${pieceTitle}がルーン聖痕 ${moveObj.to.toUpperCase()} へ進撃 (${moveObj.san})`;
+      msg = `⚔️ ${actorFaction}の${pieceTitle}がルーン聖痕 ${moveObj.to.toUpperCase()} へ進撃 (${moveObj.san || ''})`;
     }
 
     const div = document.createElement('div');
@@ -1599,6 +2308,8 @@ class WizardsChessApp {
         quickSpellsEl.appendChild(chip);
       }
     }
+
+    this._updateCataclysmHUD();
   }
 
   parseAndCastCommand(rawText) {
@@ -1662,13 +2373,16 @@ class WizardsChessApp {
     await this.executeMove('cxd5');
   }
 
-  _showGameOverModal() {
+  _showGameOverModal(customMessage = null) {
     const modal = document.getElementById('gameover-modal');
     const title = document.getElementById('gameover-title');
     const sub = document.getElementById('gameover-subtitle');
     if (!modal || !title || !sub) return;
 
-    if (this.chess.isCheckmate()) {
+    if (customMessage) {
+      title.textContent = 'SANCTUM CONQUERED — 覇王古竜討滅';
+      sub.textContent = customMessage;
+    } else if (this.chess.isCheckmate()) {
       const winner = this.chess.turn() === 'w' ? '黒曜竜の眷属 (Obsidian Brood)' : '白竜石の聖堂群 (Alabaster Brood)';
       title.textContent = 'SANCTUM CONQUERED — 覇王古竜陥落';
       sub.textContent = `竜石の聖域にて ${winner} が勝利の咆哮を上げました！`;
@@ -1739,7 +2453,39 @@ class WizardsChessApp {
     });
 
     document.getElementById('chk-action-cam')?.addEventListener('change', (e) => {
-      this.actionCamEnabled = e.target.checked;
+      this.setCombatCamMode(e.target.checked ? 'smart' : 'free');
+    });
+
+    document.getElementById('combat-cam-select')?.addEventListener('change', (e) => {
+      this.setCombatCamMode(e.target.value);
+    });
+
+    document.getElementById('btn-cam-smart')?.addEventListener('click', () => {
+      this.setCombatCamMode('smart');
+    });
+
+    document.getElementById('btn-cam-closeup-mode')?.addEventListener('click', () => {
+      this.setCombatCamMode('closeup');
+    });
+
+    document.getElementById('btn-cam-free')?.addEventListener('click', () => {
+      this.setCombatCamMode('free');
+    });
+
+    document.getElementById('combat-rule-select')?.addEventListener('change', (e) => {
+      this.setCombatRule(e.target.value);
+    });
+
+    document.getElementById('battle-mode-select')?.addEventListener('change', (e) => {
+      this.setCombatRule(e.target.value);
+    });
+
+    document.getElementById('btn-mode-tactics')?.addEventListener('click', () => {
+      this.setCombatRule('tactics');
+    });
+
+    document.getElementById('btn-mode-classic')?.addEventListener('click', () => {
+      this.setCombatRule('classic');
     });
 
     document.getElementById('game-mode-select')?.addEventListener('change', (e) => {
@@ -1851,6 +2597,12 @@ class WizardsChessApp {
       this.selectedSquare = null;
       this.legalMovesForSelected = [];
       this.clocks = { w: 600, b: 600 };
+      this._kingSlain = null;
+      this.moveActionLog = [];
+      this.collapsedSquares.clear();
+      this.cataclysmPhase = 0;
+      this.peacefulHalfMoves = 0;
+      this._updateCataclysmHUD();
       this.vfx.clearRubble();
       this.syncBoardFromFEN();
       this.updateHUD();
@@ -1868,8 +2620,10 @@ class WizardsChessApp {
     document.getElementById('btn-undo')?.addEventListener('click', () => {
       if (this.isBusy) return;
       this.chess.undo();
+      this.moveActionLog.pop();
       if (this.gameMode === 'pva' && this.chess.turn() === 'b') {
         this.chess.undo();
+        this.moveActionLog.pop();
       }
       this.lastMove = null;
       this.selectedSquare = null;
@@ -1880,7 +2634,8 @@ class WizardsChessApp {
 
     document.getElementById('btn-hint')?.addEventListener('click', () => {
       if (this.isBusy || this.chess.isGameOver()) return;
-      const best = chooseBestMove(this.chess, 2);
+      const isForbidden = (m) => this._isRepetitionForbidden(m) || this.collapsedSquares.has(m.to);
+      const best = chooseBestMove(this.chess, 2, isForbidden);
       if (best) {
         this.hintMove = best;
         this._updateBoardHighlights();
@@ -1889,6 +2644,10 @@ class WizardsChessApp {
           toast.textContent = `🔮 聖堂の神託: ${PIECE_INFO[best.piece].shortName}を ${best.from.toUpperCase()} から ${best.to.toUpperCase()} へ (${best.san})`;
         }
       }
+    });
+
+    document.getElementById('btn-cataclysm-demo')?.addEventListener('click', () => {
+      this.triggerCataclysm();
     });
 
     document.getElementById('btn-clear-debris')?.addEventListener('click', () => {
@@ -1931,6 +2690,12 @@ class WizardsChessApp {
       this.hintMove = null;
       this.selectedSquare = null;
       this.legalMovesForSelected = [];
+      this._kingSlain = null;
+      this.moveActionLog = [];
+      this.collapsedSquares.clear();
+      this.cataclysmPhase = 0;
+      this.peacefulHalfMoves = 0;
+      this._updateCataclysmHUD();
       this.vfx.clearRubble();
       this.syncBoardFromFEN();
       this.updateHUD();
@@ -2027,6 +2792,21 @@ class WizardsChessApp {
 
     this.controls.update();
     this.vfx.update(dt, elapsed);
+
+    for (let i = this.damagePopups.length - 1; i >= 0; i--) {
+      const p = this.damagePopups[i];
+      p.elapsed += dt;
+      const progress = p.elapsed / p.maxLife;
+      p.sprite.position.y = p.startPos.y + progress * 0.95;
+      p.sprite.material.opacity = Math.max(0, 1 - Math.pow(progress, 2));
+      if (progress >= 1) {
+        this.scene.remove(p.sprite);
+        p.sprite.material.map?.dispose();
+        p.sprite.material?.dispose();
+        this.damagePopups.splice(i, 1);
+      }
+    }
+
     this._updateClocks(performance.now());
 
     this.composer.render();
