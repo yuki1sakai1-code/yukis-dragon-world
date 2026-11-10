@@ -57,8 +57,8 @@ const PIECE_INFO = {
   q: {
     name: '四翼の飛翔女帝竜 (Four-Winged Elder Dragon)',
     shortName: '四翼女帝竜',
-    symbolW: '🐉',
-    symbolB: '🐉',
+    symbolW: '👸',
+    symbolB: '👸',
     value: 9,
     lore: '上下二対・計四枚の壮麗な石彫竜翼と王冠角、長大な鞭尾を備え、聖域全域を制圧する飛翔女帝古竜。'
   },
@@ -1221,7 +1221,7 @@ class WizardsChessApp {
   _resetInspector() {
     const feed = document.getElementById('combat-feed');
     if (feed) {
-      feed.innerHTML = '<div class="combat-entry">🐉 崩れた石畳と古代ルーン魔法陣の祭壇で、石造ドラゴン群が覚醒しました…</div>';
+      feed.innerHTML = '<div class="combat-entry">崩れた石畳と古代ルーン魔法陣の祭壇で、石造ドラゴン群が覚醒しました…</div>';
     }
     const titleEl = document.getElementById('inspector-title');
     const loreEl = document.getElementById('inspector-lore');
@@ -1496,7 +1496,7 @@ class WizardsChessApp {
     } else if (moveObj.san.includes('+')) {
       msg = `⚡ ${actorFaction}の${pieceTitle}が ${moveObj.to.toUpperCase()} へ飛来 — 覇王古竜に王手咆哮！`;
     } else {
-      msg = `🐉 ${actorFaction}の${pieceTitle}がルーン聖痕 ${moveObj.to.toUpperCase()} へ進撃 (${moveObj.san})`;
+      msg = `⚔️ ${actorFaction}の${pieceTitle}がルーン聖痕 ${moveObj.to.toUpperCase()} へ進撃 (${moveObj.san})`;
     }
 
     const div = document.createElement('div');

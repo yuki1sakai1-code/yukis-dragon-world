@@ -1,4 +1,4 @@
-# 🐉 DRACONIC SANCTUM — 竜石の聖域
+# 🏛️ DRACONIC SANCTUM — 竜石の聖域
 ### 竜石のゴシック大聖堂決戦 (3D Stone Dragons Edition)
 
 古代のゴシック大聖堂と崩れたルーン魔法陣の祭壇で繰り広げられる、重厚な石造古竜チェスバトル。
