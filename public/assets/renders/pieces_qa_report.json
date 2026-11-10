@@ -1,0 +1,158 @@
+[
+  {
+    "piece": "pawn",
+    "target_height_m": 1.08,
+    "verts": 6643,
+    "faces": 6666,
+    "tris": 6666,
+    "bone_count": 7,
+    "bones": [
+      "Root",
+      "Spine_Lower",
+      "Spine_Upper",
+      "Head_Jaw",
+      "Shield_L",
+      "Weapon_R",
+      "Wings_Tail"
+    ],
+    "nla_tracks": [
+      "Hit",
+      "Attack",
+      "Move",
+      "Idle"
+    ],
+    "peak_attack_frame": 12,
+    "peak_attack_disp_m": 0.8454,
+    "min_z_at_peak_m": 0.0
+  },
+  {
+    "piece": "rook",
+    "target_height_m": 1.38,
+    "verts": 7485,
+    "faces": 7178,
+    "tris": 7178,
+    "bone_count": 7,
+    "bones": [
+      "Root",
+      "Spine_Lower",
+      "Spine_Upper",
+      "Head_Jaw",
+      "Shield_L",
+      "Weapon_R",
+      "Wings_Tail"
+    ],
+    "nla_tracks": [
+      "Hit",
+      "Attack",
+      "Move",
+      "Idle"
+    ],
+    "peak_attack_frame": 12,
+    "peak_attack_disp_m": 1.0373,
+    "min_z_at_peak_m": 0.0
+  },
+  {
+    "piece": "knight",
+    "target_height_m": 1.62,
+    "verts": 6992,
+    "faces": 7066,
+    "tris": 7066,
+    "bone_count": 7,
+    "bones": [
+      "Root",
+      "Spine_Lower",
+      "Spine_Upper",
+      "Head_Jaw",
+      "Shield_L",
+      "Weapon_R",
+      "Wings_Tail"
+    ],
+    "nla_tracks": [
+      "Hit",
+      "Attack",
+      "Move",
+      "Idle"
+    ],
+    "peak_attack_frame": 12,
+    "peak_attack_disp_m": 1.2261,
+    "min_z_at_peak_m": 0.0
+  },
+  {
+    "piece": "bishop",
+    "target_height_m": 1.72,
+    "verts": 8062,
+    "faces": 8140,
+    "tris": 8140,
+    "bone_count": 7,
+    "bones": [
+      "Root",
+      "Spine_Lower",
+      "Spine_Upper",
+      "Head_Jaw",
+      "Shield_L",
+      "Weapon_R",
+      "Wings_Tail"
+    ],
+    "nla_tracks": [
+      "Hit",
+      "Attack",
+      "Move",
+      "Idle"
+    ],
+    "peak_attack_frame": 12,
+    "peak_attack_disp_m": 1.3227,
+    "min_z_at_peak_m": 0.0
+  },
+  {
+    "piece": "queen",
+    "target_height_m": 1.94,
+    "verts": 8438,
+    "faces": 8542,
+    "tris": 8542,
+    "bone_count": 7,
+    "bones": [
+      "Root",
+      "Spine_Lower",
+      "Spine_Upper",
+      "Head_Jaw",
+      "Shield_L",
+      "Weapon_R",
+      "Wings_Tail"
+    ],
+    "nla_tracks": [
+      "Hit",
+      "Attack",
+      "Move",
+      "Idle"
+    ],
+    "peak_attack_frame": 14,
+    "peak_attack_disp_m": 1.3486,
+    "min_z_at_peak_m": 0.0
+  },
+  {
+    "piece": "king",
+    "target_height_m": 2.18,
+    "verts": 8655,
+    "faces": 8446,
+    "tris": 8446,
+    "bone_count": 7,
+    "bones": [
+      "Root",
+      "Spine_Lower",
+      "Spine_Upper",
+      "Head_Jaw",
+      "Shield_L",
+      "Weapon_R",
+      "Wings_Tail"
+    ],
+    "nla_tracks": [
+      "Hit",
+      "Attack",
+      "Move",
+      "Idle"
+    ],
+    "peak_attack_frame": 12,
+    "peak_attack_disp_m": 1.4737,
+    "min_z_at_peak_m": 0.0
+  }
+]

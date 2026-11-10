@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Dependencies
+node_modules/
+
+# Production build artifacts (can be rebuilt with npm run build)
+dist/
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

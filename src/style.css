@@ -1,0 +1,803 @@
+:root {
+  --bg-basalt: rgba(14, 13, 18, 0.86);
+  --bg-stone-panel:
+    radial-gradient(120% 90% at 50% 0%, rgba(56, 48, 44, 0.34) 0%, rgba(16, 15, 21, 0.94) 72%),
+    repeating-linear-gradient(135deg, rgba(255, 248, 230, 0.018) 0px, rgba(255, 248, 230, 0.018) 2px, rgba(0, 0, 0, 0.04) 2px, rgba(0, 0, 0, 0.04) 5px),
+    linear-gradient(180deg, rgba(24, 22, 29, 0.92) 0%, rgba(11, 10, 15, 0.96) 100%);
+  --stone-bevel-light: rgba(226, 206, 168, 0.28);
+  --stone-bevel-dark: rgba(5, 4, 8, 0.92);
+  --bronze-trim: #b89047;
+  --bronze-dim: rgba(184, 144, 71, 0.42);
+  --bronze-bright: #ecd08b;
+  --text-limestone: #f1eadc;
+  --text-ash: #b5aa99;
+  --wyrm-cyan: #63d2ff;
+  --drake-ember: #ff6433;
+  --crimson-alert: #dc3c3c;
+  --shadow-cathedral:
+    0 16px 42px rgba(0, 0, 0, 0.84),
+    inset 0 1px 0 rgba(255, 241, 210, 0.18),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.72);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #07060a;
+  color: var(--text-limestone);
+  font-family: 'Shippori Mincho', 'Cinzel', Georgia, serif;
+}
+
+#canvas-container {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+}
+
+/* Carved Gothic Dragon-Stone Panel Base */
+.gothic-stone-panel {
+  pointer-events: auto;
+  background: var(--bg-stone-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--bronze-dim);
+  box-shadow: var(--shadow-cathedral);
+  border-radius: 6px;
+  position: relative;
+}
+
+/* Inner Chiselled Stone & Gothic Lancet Tracery Frame */
+.gothic-stone-panel::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(236, 208, 139, 0.15);
+  border-top-color: rgba(255, 242, 206, 0.25);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Corner Dragon-Scale Diamond Rivets */
+.gothic-stone-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 7px 7px, rgba(236, 208, 139, 0.55) 1.5px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 7px) 7px, rgba(236, 208, 139, 0.55) 1.5px, transparent 2.5px),
+    radial-gradient(circle at 7px calc(100% - 7px), rgba(236, 208, 139, 0.55) 1.5px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 7px) calc(100% - 7px), rgba(236, 208, 139, 0.55) 1.5px, transparent 2.5px);
+}
+
+/* Loading Sanctum Overlay */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(42, 32, 48, 0.96) 0%, rgba(8, 7, 12, 0.99) 75%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.65s ease, visibility 0.65s ease;
+}
+
+.loading-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loading-card {
+  width: min(520px, 90vw);
+  padding: 2.5rem 2.2rem;
+  text-align: center;
+}
+
+.dragon-rose-spinner {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bronze-bright);
+  animation: spin 8s linear infinite;
+  filter: drop-shadow(0 0 14px rgba(236, 208, 139, 0.45));
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 2rem;
+  letter-spacing: 0.14em;
+  color: var(--bronze-bright);
+  text-shadow: 0 2px 16px rgba(236, 208, 139, 0.42);
+}
+
+.loading-subtitle {
+  font-family: 'Shippori Mincho', 'Cinzel', serif;
+  font-size: 0.88rem;
+  letter-spacing: 0.1em;
+  color: var(--text-ash);
+  margin: 0.4rem 0 1.4rem;
+}
+
+.loading-bar-outer {
+  width: 100%;
+  height: 9px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--bronze-dim);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 0.85rem;
+}
+
+.loading-bar-fill {
+  width: 12%;
+  height: 100%;
+  background: linear-gradient(90deg, #7e5b21, #ecd08b, #63d2ff);
+  transition: width 0.25s ease;
+}
+
+.loading-status {
+  font-size: 0.92rem;
+  color: var(--text-limestone);
+}
+
+/* Unified HUD Grid */
+.ui-root {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: 306px 1fr 312px;
+  grid-template-areas:
+    "header header header"
+    "left   center right"
+    "footer footer footer";
+  padding: 10px 14px;
+  gap: 10px;
+}
+
+.ui-root.hud-minimized .side-panel,
+.ui-root.hud-minimized .bottom-hud {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+}
+
+/* Top Cathedral Arch Header */
+.top-hud {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 16px;
+  gap: 14px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-emblem {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: radial-gradient(circle, #352b22 0%, #141112 100%);
+  border: 1px solid var(--bronze-trim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bronze-bright);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 0 12px rgba(184, 144, 71, 0.3);
+}
+
+.brand-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.12rem;
+  letter-spacing: 0.1em;
+  color: var(--bronze-bright);
+}
+
+.brand-subtitle {
+  font-family: 'Shippori Mincho', 'Cinzel', serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--text-ash);
+}
+
+/* Turn & Evaluation Shrine */
+.turn-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 280px;
+}
+
+.turn-faction-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 15px;
+  border-radius: 4px;
+  clip-path: polygon(8px 0%, calc(100% - 8px) 0%, 100% 50%, calc(100% - 8px) 100%, 8px 100%, 0% 50%);
+  font-family: 'Shippori Mincho', 'Cinzel', serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--bronze-dim);
+  background: linear-gradient(180deg, rgba(36, 32, 42, 0.92), rgba(14, 12, 18, 0.95));
+  transition: all 0.3s ease;
+}
+
+.turn-faction-badge.in-check {
+  border-color: var(--crimson-alert);
+  box-shadow: 0 0 18px rgba(220, 60, 60, 0.7);
+  color: #ffb0b0;
+}
+
+.faction-orb {
+  width: 9px;
+  height: 9px;
+  transform: rotate(45deg);
+  background: var(--wyrm-cyan);
+  box-shadow: 0 0 10px var(--wyrm-cyan);
+}
+
+.turn-faction-badge.black-turn .faction-orb {
+  background: var(--drake-ember);
+  box-shadow: 0 0 10px var(--drake-ember);
+}
+
+.eval-bar-wrap {
+  width: 244px;
+  height: 11px;
+  background: #17141d;
+  border: 1px solid var(--bronze-dim);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.eval-bar-white {
+  height: 100%;
+  background: linear-gradient(90deg, #b9afa0, #ede6d6);
+  transition: width 0.4s ease;
+}
+
+.eval-score {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 5px;
+  line-height: 1.15;
+  border-radius: 3px;
+  background: rgba(10, 9, 14, 0.78);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #ecd08b;
+  letter-spacing: 0.03em;
+}
+
+/* Top Controls */
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.control-group label {
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  color: var(--text-ash);
+}
+
+.gothic-select, .gothic-input {
+  background: rgba(10, 9, 14, 0.9);
+  color: var(--text-limestone);
+  border: 1px solid var(--bronze-dim);
+  border-radius: 4px;
+  padding: 4px 7px;
+  font-family: 'Shippori Mincho', 'Cinzel', serif;
+  font-size: 0.72rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.gothic-select:hover, .gothic-input:focus {
+  border-color: var(--bronze-bright);
+}
+
+/* Side Panels */
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bronze-dim) transparent;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.left-panel { grid-area: left; }
+.right-panel { grid-area: right; }
+
+/* Player Faction Stone Plaques */
+.player-card {
+  padding: 9px 10px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(28, 25, 32, 0.78) 0%, rgba(12, 11, 16, 0.85) 100%);
+  border: 1px solid rgba(184, 144, 71, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.player-card.active-turn {
+  border-color: var(--bronze-bright);
+  box-shadow: 0 0 15px rgba(236, 208, 139, 0.22), inset 0 0 12px rgba(184, 144, 71, 0.1);
+}
+
+.player-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.player-crest {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--gold-border, #c5a059);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6), inset 0 0 4px rgba(246, 200, 85, 0.2);
+  background: #111015;
+  flex-shrink: 0;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.player-crest-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.white-crest {
+  border-color: #d6b876;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6), 0 0 6px rgba(255, 230, 160, 0.35);
+}
+
+.black-crest {
+  border-color: #9c3b28;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7), 0 0 6px rgba(255, 75, 40, 0.35);
+}
+
+.player-card.active-turn .white-crest {
+  box-shadow: 0 0 12px rgba(255, 215, 110, 0.7), 0 0 4px #ffe699;
+  border-color: #ffd76e;
+}
+
+.player-card.active-turn .black-crest {
+  box-shadow: 0 0 12px rgba(255, 90, 45, 0.75), 0 0 4px #ff774c;
+  border-color: #ff6a3c;
+}
+
+.player-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.player-name {
+  font-weight: 700;
+  font-size: 0.83rem;
+  color: var(--text-limestone);
+}
+
+.material-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  color: var(--bronze-bright);
+  background: rgba(184, 144, 71, 0.2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.material-badge:empty { display: none; }
+
+.player-role {
+  font-size: 0.67rem;
+  color: var(--text-ash);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chess-clock {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: rgba(5, 5, 8, 0.72);
+  border: 1px solid var(--bronze-dim);
+  color: var(--bronze-bright);
+}
+
+.captured-tray {
+  margin-top: 5px;
+  min-height: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-size: 0.92rem;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* Inner Stone Sections */
+.panel-section {
+  background: rgba(8, 7, 11, 0.46);
+  border: 1px solid rgba(184, 144, 71, 0.22);
+  border-radius: 5px;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.grimoire-section {
+  flex: 1;
+  min-height: 170px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(184, 144, 71, 0.24);
+  padding-bottom: 4px;
+}
+
+.section-header h2 {
+  font-family: 'Shippori Mincho', 'Cinzel', serif;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--bronze-bright);
+}
+
+.move-counter-pill, .anim-state-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.63rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(184, 144, 71, 0.18);
+  color: var(--bronze-bright);
+  border: 1px solid var(--bronze-dim);
+}
+
+.move-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 145px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.73rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.move-row {
+  display: grid;
+  grid-template-columns: 32px 1fr 1fr;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.move-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.move-num { color: var(--text-ash); }
+.move-san { color: var(--text-limestone); }
+.move-san.capture {
+  color: #ff8f73;
+  font-weight: 700;
+}
+
+.combat-feed {
+  border-top: 1px solid rgba(184, 144, 71, 0.2);
+  padding-top: 5px;
+  max-height: 78px;
+  overflow-y: auto;
+  font-size: 0.76rem;
+  color: #e6dac3;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.combat-entry { line-height: 1.3; }
+
+/* Chiselled Stone Buttons & Grids */
+.camera-grid, .action-buttons-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.gothic-btn {
+  background: linear-gradient(180deg, rgba(44, 39, 49, 0.92) 0%, rgba(20, 18, 25, 0.96) 100%);
+  color: var(--text-limestone);
+  border: 1px solid var(--bronze-dim);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-family: 'Shippori Mincho', 'Cinzel', serif;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.1);
+  transition: all 0.16s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.gothic-btn:hover {
+  border-color: var(--bronze-bright);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(236, 208, 139, 0.26);
+  transform: translateY(-1px);
+}
+
+.gothic-btn.active, .gothic-btn.gold-btn {
+  background: linear-gradient(180deg, #8b6623 0%, #4e3710 100%);
+  border-color: var(--bronze-bright);
+  color: #fff8e7;
+}
+
+.gothic-btn.crimson-btn {
+  background: linear-gradient(180deg, #852420 0%, #48110f 100%);
+  border-color: #ff8577;
+  color: #ffefed;
+}
+
+.gothic-btn.full-width {
+  grid-column: 1 / -1;
+  padding: 6px 9px;
+}
+
+/* Spell Input & Quick Spells */
+.spell-form {
+  display: flex;
+  gap: 5px;
+}
+
+.spell-form .gothic-input {
+  flex: 1;
+  font-family: 'JetBrains Mono', 'Shippori Mincho', monospace;
+  font-size: 0.72rem;
+}
+
+.quick-spells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.quick-spell-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(184, 144, 71, 0.15);
+  border: 1px solid var(--bronze-dim);
+  color: var(--bronze-bright);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quick-spell-chip:hover {
+  background: rgba(184, 144, 71, 0.34);
+  border-color: var(--bronze-bright);
+}
+
+/* Dragon-Stone Statue Inspector */
+.inspector-title {
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: var(--bronze-bright);
+  margin-bottom: 2px;
+}
+
+.inspector-lore {
+  font-size: 0.75rem;
+  color: var(--text-ash);
+  line-height: 1.35;
+  margin-bottom: 5px;
+}
+
+.pbr-spec-strip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  color: #c8bca4;
+  background: rgba(184, 144, 71, 0.1);
+  border: 1px solid rgba(184, 144, 71, 0.22);
+  border-radius: 3px;
+  padding: 3px 6px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.inspector-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.anim-preview-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.anim-test-btn {
+  padding: 4px 3px;
+  font-size: 0.62rem;
+}
+
+.mic-btn {
+  padding: 2px 7px;
+  font-size: 0.64rem;
+}
+
+.mic-btn.listening {
+  background: linear-gradient(180deg, #b71c1c 0%, #680f0f 100%);
+  border-color: #ff8a80;
+  box-shadow: 0 0 12px rgba(255, 82, 82, 0.7);
+  animation: pulse-mic 1.1s infinite ease-in-out;
+}
+
+@keyframes pulse-mic {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.stat-box {
+  background: rgba(0, 0, 0, 0.48);
+  border: 1px solid rgba(184, 144, 71, 0.2);
+  border-radius: 4px;
+  padding: 3px 5px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.58rem;
+  color: var(--text-ash);
+}
+
+.stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-limestone);
+}
+
+.cinematic-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: var(--text-ash);
+  cursor: pointer;
+}
+
+/* Bottom Footer Toast */
+.bottom-hud {
+  grid-area: footer;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.status-pill {
+  padding: 5px 18px;
+  font-size: 0.73rem;
+  letter-spacing: 0.04em;
+  color: var(--text-limestone);
+  border-radius: 99px;
+}
+
+/* Modals */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(5, 4, 8, 0.8);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-backdrop.hidden { display: none; }
+
+.modal-card {
+  width: min(450px, 92vw);
+  padding: 1.9rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.modal-title {
+  font-family: 'Shippori Mincho', 'Cinzel Decorative', serif;
+  font-size: 1.35rem;
+  color: var(--bronze-bright);
+}
+
+.modal-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-limestone);
+}
+
+.promotion-choices, .modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 6px;
+}
+
+.gameover-crest { font-size: 2.8rem; }
+
+@media (max-width: 1120px) {
+  .ui-root {
+    grid-template-columns: 256px 1fr 262px;
+  }
+}
