@@ -272,7 +272,7 @@ class WizardsChessApp {
     this.pieceInstances = new Map();
     this.activeMixers = new Set();
     this.pedestalMode = 'no-base';
-    this.combatRule = 'tactics';
+    this.combatRule = 'classic';
     this.damagePopups = [];
     this._kingSlain = null;
     this.moveActionLog = [];
@@ -290,6 +290,7 @@ class WizardsChessApp {
     this._setupLighting();
     this.setLightingPreset('moonlit');
     this._bindUIEvents();
+    this.setCombatRule('classic', false);
     this._initAssets();
 
     // Expose for automated QA inspection
@@ -556,7 +557,7 @@ class WizardsChessApp {
     }
   }
 
-  setCombatRule(rule) {
+  setCombatRule(rule, showToast = true) {
     this.combatRule = rule;
     const isTactics = rule === 'tactics';
 
@@ -585,11 +586,13 @@ class WizardsChessApp {
       rpgStats.style.display = isTactics ? 'block' : 'none';
     }
 
-    const toast = document.getElementById('status-toast');
-    if (toast) {
-      toast.textContent = isTactics
-        ? '⚔️ 対戦モード: 竜石タクティクス (HP/攻撃/防御バトル) に切り替えました'
-        : '♟️ 対戦モード: ワンショットバトル (一撃必殺・通常ルール) に切り替えました';
+    if (showToast) {
+      const toast = document.getElementById('status-toast');
+      if (toast) {
+        toast.textContent = isTactics
+          ? '⚔️ 対戦モード: 竜石タクティクス (HP/攻撃/防御バトル) に切り替えました'
+          : '♟️ 対戦モード: ワンショットバトル (一撃必殺・通常ルール) に切り替えました';
+      }
     }
   }
 
@@ -1797,8 +1800,15 @@ class WizardsChessApp {
       }
     }
 
+    let bossRaidOutcome = null;
     if (this.chess.inCheck()) {
       this.sfx.playCheckHorn();
+
+      // 【条件4: 覇王古竜（キング）のレイドボス耐久バトル】
+      // 竜石タクティクスモード時、王手をかけた瞬間に攻撃側から相手キングへ「王手竜炎ブレス」を着弾させ、キングからも反撃ブレスが放たれる
+      if (this.combatRule === 'tactics') {
+        bossRaidOutcome = await this._handleCheckBossRaid(moveObj);
+      }
     }
 
     this.moveActionLog.push({
@@ -1813,7 +1823,7 @@ class WizardsChessApp {
     this.updateHUD();
 
     // お互いの戦闘が往復10ターン以上実行されない毎にフィールドを狭くしていって逃げ場を縮小！
-    const isCombat = Boolean(combatOutcome?.isCombat);
+    const isCombat = Boolean(combatOutcome?.isCombat || bossRaidOutcome?.isCombat);
     if (isCombat) {
       // 交戦が発生: 聖域崩壊タイマーをリセット
       const wasWarning = this.peacefulHalfMoves >= 14;
@@ -2062,6 +2072,213 @@ class WizardsChessApp {
 
       return { isCombat: false, destroyed: false };
     }
+  }
+
+  async _handleCheckBossRaid(moveObj) {
+    const enemyColor = this.chess.turn(); // 王手をかけられた側 (相手)
+    const attackerColor = enemyColor === 'w' ? 'b' : 'w';
+
+    // 相手キングを検索
+    let victimKing = null;
+    let victimKingSquare = null;
+    for (const [sq, inst] of this.pieceInstances.entries()) {
+      if (inst.type === 'k' && inst.color === enemyColor) {
+        victimKing = inst;
+        victimKingSquare = sq;
+        break;
+      }
+    }
+    if (!victimKing) return null;
+
+    // 王手をかけた駒（直前に移動した駒）
+    const attackerInst = this.pieceInstances.get(moveObj.to);
+    if (!attackerInst) return null;
+
+    const atkPos = this.squareToWorld(moveObj.to);
+    const kingPos = this.squareToWorld(victimKingSquare);
+    const toKing = new THREE.Vector3().subVectors(kingPos, atkPos).normalize();
+
+    // 攻撃カメラ演出（スマートカメラ判定）
+    let triggerActionCam = false;
+    if (this.actionCamEnabled) {
+      if (this.combatCamMode === 'closeup') {
+        triggerActionCam = true;
+      } else if (this.combatCamMode === 'free') {
+        triggerActionCam = false;
+      } else {
+        triggerActionCam = !this._isOverviewingCamera();
+      }
+    }
+
+    let savedCam = null;
+    if (triggerActionCam) {
+      savedCam = {
+        pos: this.camera.position.clone(),
+        target: this.controls.target.clone()
+      };
+      const midPos = new THREE.Vector3().addVectors(atkPos, kingPos).multiplyScalar(0.5);
+      const camPos = midPos.clone().add(new THREE.Vector3(0, 3.4, 4.8));
+      this._tweenCamera(camPos, midPos, 0.42);
+    }
+
+    const actorFaction = attackerColor === 'w' ? '白竜石の聖堂群' : '黒曜竜の眷属';
+    const kingFaction = enemyColor === 'w' ? '白竜石の聖堂群' : '黒曜竜の眷属';
+    const pieceTitle = PIECE_INFO[attackerInst.type]?.shortName || '石造竜';
+
+    const toast = document.getElementById('status-toast');
+    if (toast) {
+      toast.textContent = `👑 王手竜炎ブレス！ ${actorFaction}の${pieceTitle}が覇王古竜に急襲ブレス！`;
+    }
+
+    // 攻撃側の向きをキングへ
+    attackerInst.root.rotation.y = Math.atan2(-toKing.x, -toKing.z);
+    this._playPieceAnimation(attackerInst, 'Attack', false);
+    await this._wait(180);
+
+    // ブレス発射！
+    this.vfx.spawnDragonBreath(atkPos, kingPos, attackerColor === 'w');
+    await this._wait(260);
+
+    // キングが被弾
+    this._playPieceAnimation(victimKing, 'Hit', false);
+    this.sfx.playSwordStrikeAndShatter();
+
+    // ダメージ計算: 攻撃力 - キング防御力40 (最低保証5)
+    const rawDiff = (attackerInst.atk || 25) - (victimKing.def || 40);
+    const damageToKing = Math.max(5, rawDiff);
+
+    const curKingHp = victimKing.hp !== undefined ? victimKing.hp : victimKing.maxHp;
+    const newKingHp = Math.max(0, curKingHp - damageToKing);
+    victimKing.updateHp(newKingHp);
+    this._spawnDamageNumber(kingPos, damageToKing);
+
+    if (this.selectedSquare === victimKingSquare) {
+      this._updateInspector(victimKing);
+    }
+
+    await this._wait(240);
+
+    let counterDmg = null;
+    let attackerDestroyed = false;
+
+    // キングのHPが 0 に到達した場合
+    if (newKingHp <= 0) {
+      this.vfx.spawnShatterExplosion(
+        kingPos,
+        this._getPieceMaterial('k', victimKing.color),
+        victimKing.color === 'w'
+      );
+      this._removePieceInstance(victimKingSquare);
+      const kCoords = this.chess._squareToCoords(victimKingSquare);
+      if (kCoords && this.chess._board[kCoords.r]) {
+        this.chess._board[kCoords.r][kCoords.c] = null;
+      }
+      this._kingSlain = victimKing.color;
+
+      if (toast) {
+        toast.textContent = `💥 覇王古竜討滅！ 聖域の支配者 ${kingFaction} のキングが崩御しました！`;
+      }
+    } else {
+      // キング生存時: 覇王古竜からの猛反撃ブレス！
+      const toAtk = new THREE.Vector3().subVectors(atkPos, kingPos).normalize();
+      victimKing.root.rotation.y = Math.atan2(-toAtk.x, -toAtk.z);
+      this._playPieceAnimation(victimKing, 'Attack', false);
+      await this._wait(180);
+
+      this.vfx.spawnDragonBreath(kingPos, atkPos, victimKing.color === 'w');
+      await this._wait(240);
+
+      this._playPieceAnimation(attackerInst, 'Hit', false);
+      this.sfx.playSwordStrikeAndShatter();
+
+      const counterRaw = (victimKing.atk || 50) - (attackerInst.def || 10);
+      counterDmg = Math.max(5, counterRaw);
+
+      const curAtkHp = attackerInst.hp !== undefined ? attackerInst.hp : attackerInst.maxHp;
+      const newAtkHp = Math.max(0, curAtkHp - counterDmg);
+      attackerInst.updateHp(newAtkHp);
+      this._spawnDamageNumber(atkPos, counterDmg);
+
+      if (this.selectedSquare === moveObj.to) {
+        this._updateInspector(attackerInst);
+      }
+
+      await this._wait(220);
+
+      if (newAtkHp <= 0) {
+        // 攻撃側が返り討ち粉砕
+        attackerDestroyed = true;
+        this.vfx.spawnShatterExplosion(
+          atkPos,
+          this._getPieceMaterial(attackerInst.type, attackerInst.color),
+          attackerInst.color === 'w'
+        );
+        this._removePieceInstance(moveObj.to);
+        const aCoords = this.chess._squareToCoords(moveObj.to);
+        if (aCoords && this.chess._board[aCoords.r]) {
+          this.chess._board[aCoords.r][aCoords.c] = null;
+        }
+        if (attackerInst.type === 'k') {
+          this._kingSlain = attackerInst.color;
+        }
+        if (toast) {
+          toast.textContent = `💥 覇王古竜の猛反撃！ 王手をかけた${pieceTitle}が返り討ち粉砕されました！`;
+        }
+        await this._wait(250);
+      } else {
+        this._playPieceAnimation(attackerInst, 'Idle', true);
+        attackerInst.root.rotation.y = attackerInst.defaultYaw;
+      }
+
+      this._playPieceAnimation(victimKing, 'Idle', true);
+      victimKing.root.rotation.y = victimKing.defaultYaw;
+    }
+
+    // カメラ復帰
+    if (savedCam) {
+      await this._wait(200);
+      this._tweenCamera(savedCam.pos, savedCam.target, 0.48);
+    }
+
+    // 戦闘ログに王手レイドボス戦の経緯を記録
+    this._logBossRaid(moveObj, attackerInst, victimKing, damageToKing, counterDmg, attackerDestroyed);
+
+    return {
+      isCombat: true,
+      damageToKing,
+      counterDmg,
+      attackerDestroyed,
+      kingDestroyed: newKingHp <= 0
+    };
+  }
+
+  _logBossRaid(moveObj, attackerInst, victimKing, damageToKing, counterDmg, attackerDestroyed) {
+    const feed = document.getElementById('combat-feed');
+    if (!feed) return;
+
+    const actorFaction = attackerInst.color === 'w' ? '白竜石' : '黒曜竜';
+    const kingFaction = victimKing.color === 'w' ? '白竜石' : '黒曜竜';
+    const pieceTitle = PIECE_INFO[attackerInst.type]?.shortName || '石造竜';
+
+    let msg = `👑 王手竜炎！ ${actorFaction}の${pieceTitle}(攻${attackerInst.atk})が覇王古竜(防${victimKing.def})に ${damageToKing} ダメージ！ (キング残HP: ${victimKing.hp}/${victimKing.maxHp})`;
+    if (victimKing.hp <= 0) {
+      msg += ` 🏆 覇王古竜を完全討滅！`;
+    } else if (counterDmg !== null) {
+      if (attackerDestroyed) {
+        msg += ` 💥 覇王猛反撃！ 古竜(攻${victimKing.atk})が ${pieceTitle}(防${attackerInst.def})に ${counterDmg} 反撃ダメ — 返り討ち粉砕！`;
+      } else {
+        msg += ` 💥 覇王反撃！ 古竜(攻${victimKing.atk})が ${pieceTitle}(防${attackerInst.def})に ${counterDmg} 反撃ダメ！ (残HP: ${attackerInst.hp}/${attackerInst.maxHp})`;
+      }
+    }
+
+    const div = document.createElement('div');
+    div.className = 'combat-entry check-raid';
+    div.style.color = '#ffb300';
+    div.style.fontWeight = 'bold';
+    div.style.borderLeft = '2px solid #ffb300';
+    div.style.paddingLeft = '4px';
+    div.textContent = msg;
+    feed.prepend(div);
   }
 
   _tweenPosition(obj, fromPos, toPos, durationSec, isJump = false) {
@@ -2335,6 +2552,11 @@ class WizardsChessApp {
       const winner = this.chess.turn() === 'w' ? '黒曜竜の眷属 (Obsidian Brood)' : '白竜石の聖堂群 (Alabaster Brood)';
       title.textContent = 'SANCTUM CONQUERED — 覇王古竜陥落';
       sub.textContent = `竜石の聖域にて ${winner} が勝利の咆哮を上げました！`;
+    } else if (this.chess.isStalemate()) {
+      const winner = this.chess.turn() === 'w' ? '黒曜竜の眷属 (Obsidian Brood)' : '白竜石の聖堂群 (Alabaster Brood)';
+      const loser = this.chess.turn() === 'w' ? '白竜石の聖堂群 (Alabaster Brood)' : '黒曜竜の眷属 (Obsidian Brood)';
+      title.textContent = 'SANCTUM SURROUNDED — 聖域包囲殲滅';
+      sub.textContent = `四方を完全に包囲され、逃げ場と魔力を絶たれた ${loser} が屈服しました！ ${winner} の完全勝利！`;
     } else {
       title.textContent = 'ARCANE STALEMATE — 竜魔力の均衡';
       sub.textContent = '双竜群の魔力が拮抗し、聖域は静寂に包まれました。';

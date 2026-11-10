@@ -535,7 +535,7 @@ export class SanctumChess7 {
   }
 
   isDraw() {
-    if (this.isStalemate()) return true;
+    // ステイルメイトは包囲殲滅勝利（手番側の敗北）に変更されたため引き分けには含めない
     if (this._halfMoves >= 100) return true; // 50-move rule
     return false;
   }

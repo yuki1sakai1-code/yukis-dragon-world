@@ -73,7 +73,11 @@ export function evaluateBoard(chess) {
   if (chess.isCheckmate()) {
     return chess.turn() === 'w' ? -99999 : 99999;
   }
-  if (chess.isDraw() || chess.isStalemate() || chess.isThreefoldRepetition()) {
+  // ステイルメイト（手詰まり）は動けなくなった手番側の敗北（包囲勝利: SANCTUM SURROUNDED）
+  if (chess.isStalemate()) {
+    return chess.turn() === 'w' ? -99999 : 99999;
+  }
+  if (chess.isDraw() || chess.isThreefoldRepetition()) {
     return 0;
   }
 

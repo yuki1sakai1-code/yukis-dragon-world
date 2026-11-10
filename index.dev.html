@@ -45,6 +45,11 @@
       </div>
       <p id="loading-status" class="loading-status">ドラゴンたちを呼び覚まし中...</p>
     </div>
+
+    <!-- Loading Screen Bottom Copyright -->
+    <div class="loading-copyright">
+      🏛️ © 2026 yuki1sakai1-code. All Rights Reserved.
+    </div>
   </div>
 
   <!-- Unified Gothic Cathedral & Stone-Dragon Sanctum HUD -->
@@ -83,8 +88,8 @@
         <div class="control-group">
           <label for="combat-rule-select">対戦モード (Battle Mode)</label>
           <select id="combat-rule-select" class="gothic-select">
-            <option value="tactics" selected>⚔️ 竜石タクティクス (HP/攻/防)</option>
-            <option value="classic">♟️ ワンショットバトル (一撃必殺)</option>
+            <option value="classic" selected>♟️ ワンショットバトル (一撃必殺)</option>
+            <option value="tactics">⚔️ 竜石タクティクス (HP/攻/防)</option>
           </select>
         </div>
         <div class="control-group">
@@ -219,17 +224,23 @@
         </div>
         <div class="control-group" style="margin-top: 5px;">
           <select id="battle-mode-select" class="gothic-select full-width" title="対戦ルールの切替 (ワンショットバトル vs HP/攻撃/防御タクティクス)">
-            <option value="tactics" selected>⚔️ 竜石タクティクス (HP/攻撃/防御バトル)</option>
-            <option value="classic">♟️ ワンショットバトル (一撃必殺)</option>
+            <option value="classic" selected>♟️ ワンショットバトル (一撃必殺)</option>
+            <option value="tactics">⚔️ 竜石タクティクス (HP/攻撃/防御バトル)</option>
           </select>
         </div>
         <div class="battle-mode-btn-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px;">
-          <button type="button" id="btn-mode-tactics" class="gothic-btn active" style="font-size: 0.72rem; padding: 6px 4px; white-space: nowrap;" title="HP・攻撃力・防御力を参照する本格タクティクスバトル">
+          <button type="button" id="btn-mode-tactics" class="gothic-btn" style="font-size: 0.72rem; padding: 6px 4px; white-space: nowrap;" title="HP・攻撃力・防御力を参照する本格タクティクスバトル">
             ⚔️ HP・攻防バトル
           </button>
-          <button type="button" id="btn-mode-classic" class="gothic-btn" style="font-size: 0.72rem; padding: 6px 4px; white-space: nowrap;" title="ワンショットバトル（一撃必殺・HPバー非表示）">
+          <button type="button" id="btn-mode-classic" class="gothic-btn active" style="font-size: 0.72rem; padding: 6px 4px; white-space: nowrap;" title="ワンショットバトル（一撃必殺・HPバー非表示）">
             ♟️ ワンショットバトル
           </button>
+        </div>
+
+        <!-- 決着条件ハイライト (Win Conditions) -->
+        <div style="margin-top: 6px; font-size: 0.65rem; color: var(--text-ash); line-height: 1.38; padding: 5px 7px; background: rgba(0,0,0,0.42); border-radius: 4px; border-left: 2px solid var(--bronze-bright);">
+          <div>👑 <b>覇王古竜レイド耐久:</b> 王手でブレス砲撃＆古竜の猛反撃！ キングHP100削り切り討伐でも勝利！</div>
+          <div style="margin-top: 2px;">🛡️ <b>聖域包囲殲滅:</b> 手詰まり（ステイルメイト）は包囲側の完全勝利！</div>
         </div>
 
         <!-- 聖域崩落（フィールド収縮）インジケーター -->
@@ -318,7 +329,7 @@
             </div>
           </div>
           <!-- Draconic Battle RPG Stats (HP / ATK / DEF) -->
-          <div class="dragon-rpg-stats" id="inspector-rpg-stats" style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(200, 160, 90, 0.4); border-radius: 4px;">
+          <div class="dragon-rpg-stats" id="inspector-rpg-stats" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(200, 160, 90, 0.4); border-radius: 4px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
               <span style="font-size: 11px; font-weight: 700; color: #e8d8b8; letter-spacing: 0.05em;">生命力 (HP)</span>
               <span id="inspector-hp-text" style="font-size: 11px; font-family: 'JetBrains Mono', monospace; color: #ff6b6b; font-weight: 700;">— / —</span>
