@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Search Engine & AI Crawler Privacy Controls (Private Artwork) -->
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate" />
+  <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+  <meta name="bingbot" content="noindex, nofollow, noarchive, nosnippet" />
+  <meta name="slurp" content="noindex, nofollow" />
+  <meta name="robots" content="noai, noimageai" />
+  <title>DRACONIC SANCTUM — 竜石の聖域・ゴシック大聖堂決戦 (3D Stone Dragons Edition)</title>
+  <link rel="icon" type="image/png" sizes="256x256" href="/assets/images/crest_obsidian_black.png" />
+  <link rel="apple-touch-icon" href="/assets/images/crest_obsidian_black.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Shippori+Mincho:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Loading Sanctum Overlay -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-card gothic-stone-panel">
+      <div class="dragon-rose-spinner" aria-hidden="true">
+        <svg viewBox="0 0 64 64" width="58" height="58">
+          <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="6 3"/>
+          <polygon points="32,6 39,25 58,32 39,39 32,58 25,39 6,32 25,25" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="32" cy="32" r="7" fill="currentColor" opacity="0.85"/>
+        </svg>
+      </div>
+      <h1 class="loading-title">DRACONIC SANCTUM</h1>
+      <p class="loading-subtitle">竜石の聖域・大聖堂祭壇決戦 • 6 Carved Stone Dragon Breeds</p>
+      <div class="loading-bar-outer">
+        <div id="loading-bar-fill" class="loading-bar-fill"></div>
+      </div>
+      <p id="loading-status" class="loading-status">6種の石造ドラゴン群と古代ルーン祭壇を召喚中...</p>
+    </div>
+  </div>
+
+  <!-- Unified Gothic Cathedral & Stone-Dragon Sanctum HUD -->
+  <div id="ui-root" class="ui-root">
+    <!-- Top Gothic Pointed-Arch Header -->
+    <header class="top-hud gothic-stone-panel">
+      <div class="brand-block">
+        <div class="brand-emblem" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="28" height="28">
+            <path d="M24 4 L31 15 L44 11 L37 25 L42 38 L24 33 L6 38 L11 25 L4 11 L17 15 Z" fill="none" stroke="currentColor" stroke-width="2.2"/>
+            <circle cx="24" cy="22" r="5" fill="currentColor"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">DRACONIC SANCTUM</h1>
+          <p class="brand-subtitle">竜石のゴシック大聖堂 • 6種の石造古竜 • 古代ルーン岩場祭壇</p>
+        </div>
+      </div>
+
+
+      <!-- Center Gothic Sanctum Turn & Arcane Balance Shrine -->
+      <div class="turn-banner" id="turn-banner">
+        <div class="turn-faction-badge white-turn" id="turn-badge">
+          <span class="faction-orb" id="turn-orb"></span>
+          <span id="turn-text">白竜石の咆哮 — ALABASTER WYRM BROOD</span>
+        </div>
+        <div class="eval-bar-wrap" title="聖域の竜魔力均衡 (Sanctum Power Balance)">
+          <div class="eval-bar-white" id="eval-bar-white" style="width: 50%;"></div>
+          <span class="eval-score" id="eval-score">+0.0</span>
+        </div>
+      </div>
+
+
+      <!-- Top Right Sanctum Controls -->
+      <div class="top-controls">
+        <div class="control-group">
+          <label for="game-mode-select">聖域決戦モード</label>
+          <select id="game-mode-select" class="gothic-select">
+            <option value="pva" selected>対古竜導師AI (PvE)</option>
+            <option value="pvp">双竜契約対戦 (PvP)</option>
+            <option value="ava">石造竜群AI激突 (AI vs AI)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="ai-depth-select">古竜AI知略</label>
+          <select id="ai-depth-select" class="gothic-select">
+            <option value="1">幼竜の直感 (高速)</option>
+            <option value="2" selected>飛竜の戦術 (標準)</option>
+            <option value="3">覇王古竜の叡智 (強敵)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="lighting-select">大聖堂照明</label>
+          <select id="lighting-select" class="gothic-select">
+            <option value="candlelight">竜火の篝火 (Torchlight)</option>
+            <option value="moonlit" selected>薔薇窓の月光 (Moonlit)</option>
+            <option value="bloodmoon">紅蓮の竜月 (Blood Moon)</option>
+          </select>
+        </div>
+        <button id="btn-bgm-toggle" class="gothic-btn icon-btn active" title="聖譚詩BGM (Beyond the Great Crest) の切替">
+          🎵 <span class="btn-label">BGM ON</span>
+        </button>
+        <button id="btn-audio-toggle" class="gothic-btn icon-btn active" title="聖堂効果音 (SE) の切替">
+          🔊 <span class="btn-label">効果音 ON</span>
+        </button>
+        <button id="btn-toggle-ui" class="gothic-btn icon-btn" title="UIパネル表示切替 (Hキー)">
+          👁️ <span class="btn-label">HUD</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Left Column: Dragon Broods, Clocks, Shattered Relics & Sanctum Chronicle -->
+    <aside class="side-panel left-panel gothic-stone-panel" id="left-panel">
+      <!-- Black Obsidian Dragon Brood Card -->
+      <div class="player-card black-card" id="card-black">
+        <div class="player-header">
+          <div class="player-crest black-crest" title="黒曜玄武岩の古竜群">
+            <img src="/assets/images/crest_obsidian_black.png" alt="黒曜竜の眷属 紋章" class="player-crest-img">
+          </div>
+          <div class="player-info">
+            <div class="player-name-row">
+              <span class="player-name">黒曜竜の眷属</span>
+              <span class="material-badge" id="black-advantage"></span>
+            </div>
+            <span class="player-role" id="black-role-label">Obsidian Brood • AI導師</span>
+          </div>
+          <div class="chess-clock" id="clock-black">10:00</div>
+        </div>
+        <div class="captured-tray" id="captured-by-black" title="黒曜竜群が粉砕した白竜石の眷属"></div>
+      </div>
+
+      <!-- White Alabaster Dragon Brood Card -->
+      <div class="player-card white-card active-turn" id="card-white">
+        <div class="player-header">
+          <div class="player-crest white-crest" title="白亜石灰岩の聖堂竜群">
+            <img src="/assets/images/crest_alabaster_white.png" alt="白竜石の聖堂群 紋章" class="player-crest-img">
+          </div>
+          <div class="player-info">
+            <div class="player-name-row">
+              <span class="player-name">白竜石の聖堂群</span>
+              <span class="material-badge" id="white-advantage"></span>
+            </div>
+            <span class="player-role" id="white-role-label">Alabaster Brood • 契約者</span>
+          </div>
+          <div class="chess-clock" id="clock-white">10:00</div>
+        </div>
+        <div class="captured-tray" id="captured-by-white" title="白竜石群が粉砕した黒曜竜の眷属"></div>
+      </div>
+
+      <!-- Sanctum Battle Chronicle -->
+      <div class="panel-section grimoire-section">
+        <div class="section-header">
+          <h2>📜 聖域竜戦クロニクル</h2>
+          <span class="move-counter-pill" id="move-count-pill">第1刻</span>
+        </div>
+        <div class="move-list" id="move-list"></div>
+        <div class="combat-feed" id="combat-feed">
+          <div class="combat-entry">🐉 崩れた石畳と古代ルーン魔法陣の祭壇で、石造ドラゴン群が覚醒しました…</div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Right Column: Sanctum Cameras, Dragon Command, Stone-Dragon Anatomy Inspector & Scenarios -->
+    <aside class="side-panel right-panel gothic-stone-panel" id="right-panel">
+      <!-- Camera Sanctum Views -->
+      <div class="panel-section">
+        <div class="section-header">
+          <h2>🎥 聖域カメラ視点</h2>
+          <label class="cinematic-toggle" title="竜のブレス・激突時に迫力の戦闘カメラへ自動遷移">
+            <input type="checkbox" id="chk-action-cam" checked />
+            <span>激突カメラ</span>
+          </label>
+        </div>
+        <div class="camera-grid">
+          <button class="gothic-btn cam-btn active" data-cam="white">白竜の岩座</button>
+          <button class="gothic-btn cam-btn" data-cam="black">黒竜の岩座</button>
+          <button class="gothic-btn cam-btn" data-cam="overhead">魔法陣祭壇・俯瞰</button>
+          <button class="gothic-btn cam-btn" data-cam="cathedral">ゴシック大聖堂全景</button>
+          <button class="gothic-btn cam-btn full-width" data-cam="closeup" id="btn-cam-closeup">🔍 石造ドラゴン解剖マクロ鑑賞</button>
+        </div>
+      </div>
+
+      <!-- Dragon Pedestal / Base Mode Setting -->
+      <div class="panel-section">
+        <div class="section-header">
+          <h2>🗿 古竜の土台形態メニュー</h2>
+        </div>
+        <div class="control-group" style="margin-top: 5px;">
+          <select id="pedestal-mode-select" class="gothic-select full-width" title="古竜の土台（石座）の表示・非表示を切り替えます">
+            <option value="with-base">🪨 崩壊聖域の岩座あり</option>
+            <option value="no-base" selected>🐉 純粋古竜・土台なし (マス接地)</option>
+          </select>
+        </div>
+        <div class="pedestal-btn-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px;">
+          <button type="button" id="btn-pedestal-with" class="gothic-btn" title="崩壊聖域の岩座付き">
+            🪨 岩座あり
+          </button>
+          <button type="button" id="btn-pedestal-none" class="gothic-btn active" title="土台を除去し、古竜がマス目に直接接地するバージョン">
+            🐉 土台なし
+          </button>
+        </div>
+      </div>
+
+      <!-- Voice / Runic Dragon Command -->
+      <div class="panel-section">
+        <div class="section-header">
+          <h2>⚡ 竜語号令コマンド</h2>
+          <button type="button" id="btn-voice-cmd" class="gothic-btn mic-btn" title="音声で石造竜に号令 (例: 'ワイバーン f3' / 'Nf3')">
+            🎙️ 音声号令
+          </button>
+        </div>
+        <form id="spell-form" class="spell-form" autocomplete="off">
+          <input
+            type="text"
+            id="spell-input"
+            class="gothic-input"
+            placeholder="例: ワイバーン f3, 双頭竜 c4, e4, Nf3"
+          />
+          <button type="submit" class="gothic-btn gold-btn">号令</button>
+        </form>
+        <div class="quick-spells" id="quick-spells"></div>
+      </div>
+
+      <!-- Selected Carved-Stone Dragon Inspector -->
+      <div class="panel-section inspector-section">
+        <div class="section-header">
+          <h2>🐉 石造ドラゴン解剖図鑑</h2>
+          <span class="anim-state-pill" id="inspector-anim-pill">IDLE</span>
+        </div>
+        <div class="inspector-body" id="inspector-body">
+          <div class="inspector-title" id="inspector-title">石造竜未選択</div>
+          <div class="inspector-lore" id="inspector-lore">
+            祭壇の石造ドラゴンをクリックすると、竜種の特徴・2K竜鱗石彫PBR・7ボーン骨格・進撃可能なルーン聖痕を確認できます。
+          </div>
+          <div class="pbr-spec-strip" id="inspector-pbr-strip">
+            <span>2K Osteoderm PBR</span> • <span>Ruined Crag</span> • <span>Rune Breath</span>
+          </div>
+          <div class="inspector-stats">
+            <div class="stat-box">
+              <span class="stat-label">聖痕座標</span>
+              <span class="stat-val" id="inspector-square">—</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">進撃経路</span>
+              <span class="stat-val" id="inspector-moves">0</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">竜骨格リグ</span>
+              <span class="stat-val" id="inspector-bones">7 Bones</span>
+            </div>
+          </div>
+          <div class="anim-preview-bar" title="Blender 5.2 NLA 石造ドラゴン骨格モーション再生">
+            <button type="button" class="gothic-btn anim-test-btn" data-anim="Idle">咆哮待機</button>
+            <button type="button" class="gothic-btn anim-test-btn" data-anim="Move">飛翔進撃</button>
+            <button type="button" class="gothic-btn anim-test-btn" data-anim="Attack">竜撃噛砕</button>
+            <button type="button" class="gothic-btn anim-test-btn" data-anim="Hit">被弾咆哮</button>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Sanctum Battle Scenarios & Actions -->
+      <div class="panel-section actions-section">
+        <div class="section-header">
+          <h2>🏰 聖域決戦シナリオ</h2>
+          <select id="scenario-select" class="gothic-select" title="古竜軍団の激突局面を召喚">
+            <option value="standard">魔法陣祭壇・全面開戦</option>
+            <option value="sacrifice">飛竜ワイバーンの強襲</option>
+            <option value="immortal">双頭竜と四翼古竜の激突</option>
+            <option value="endgame" selected>双覇王古竜の最終決戦</option>
+          </select>
+        </div>
+        <div class="action-buttons-grid">
+          <button id="btn-battle-demo" class="gothic-btn crimson-btn full-width" title="石造ドラゴンの竜火ブレス・噛み砕き・石片爆散を即座に実演">
+            🔥 竜炎ブレス＆石砕デモ (Dragon Clash)
+          </button>
+          <button id="btn-new-game" class="gothic-btn">🔄 儀式を再開</button>
+          <button id="btn-undo" class="gothic-btn">↩️ 時を戻す</button>
+          <button id="btn-hint" class="gothic-btn">🔮 古竜の神託</button>
+          <button id="btn-clear-debris" class="gothic-btn">🧹 砕石を浄化</button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- Bottom Center Status / Coordinate Toast -->
+    <footer class="bottom-hud">
+      <div class="status-pill gothic-stone-panel" id="status-toast">
+        左クリック: 石造ドラゴンの選択・ルーン聖痕へ進撃 ／ ドラッグ: 聖堂回転 ／ 右ドラッグ: 平行移動 ／ ホイール: ズーム
+      </div>
+    </footer>
+  </div>
+
+  <!-- Dragon Ascension (Promotion) Modal -->
+  <div id="promotion-modal" class="modal-backdrop hidden">
+    <div class="modal-card gothic-stone-panel">
+      <h2 class="modal-title">🐉 幼竜の古竜覚醒 (Draconic Ascension)</h2>
+      <p class="modal-subtitle">聖域の最奥へ到達した幼竜ドレイクを覚醒させる上位古竜を選択してください:</p>
+      <div class="promotion-choices" id="promotion-choices">
+        <button class="gothic-btn promo-btn" data-piece="q">🐉 四翼の飛翔女帝竜</button>
+        <button class="gothic-btn promo-btn" data-piece="r">🦕 重装鎧地竜</button>
+        <button class="gothic-btn promo-btn" data-piece="b">🐍 双頭の秘術竜</button>
+        <button class="gothic-btn promo-btn" data-piece="n">🦅 双翼ワイバーン</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div id="gameover-modal" class="modal-backdrop hidden">
+    <div class="modal-card gothic-stone-panel">
+      <h2 class="modal-title" id="gameover-title">SANCTUM CONQUERED</h2>
+      <p class="modal-subtitle" id="gameover-subtitle">ゴシック大聖堂の祭壇にて覇王古竜の石像が砕け散りました。</p>
+      <div class="modal-actions">
+        <button id="btn-modal-rematch" class="gothic-btn gold-btn">🔥 再び竜群を召喚する</button>
+        <button id="btn-modal-inspect" class="gothic-btn">🏛️ 大聖堂と古竜を鑑賞</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

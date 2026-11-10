@@ -37,7 +37,8 @@ jobs:
       - name: Build with Vite
         run: |
           npm run build
-          cp wizards-chess-standalone.html dist/
+          cp wizards-chess-standalone.html dist/index.html
+          cp wizards-chess-standalone.html dist/wizards-chess-standalone.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -50,3 +51,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
