@@ -7,6 +7,13 @@ const rootDir = process.cwd();
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dragon-chess-pack-'));
 const blenderExe = 'C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe';
 
+const devHtmlPath = path.join(rootDir, 'index.dev.html');
+const indexHtmlPath = path.join(rootDir, 'index.html');
+
+if (fs.existsSync(devHtmlPath)) {
+  fs.copyFileSync(devHtmlPath, indexHtmlPath);
+}
+
 console.log('=== 1. Building Vite Production Bundle ===');
 execSync('npm run build', { stdio: 'inherit' });
 
@@ -141,7 +148,9 @@ html = html.replace(
 
 const outPath = path.join(rootDir, 'wizards-chess-standalone.html');
 fs.writeFileSync(outPath, html, 'utf8');
+fs.copyFileSync(outPath, indexHtmlPath);
+fs.copyFileSync(outPath, path.join(distDir, 'index.html'));
 fs.rmSync(tmpDir, { recursive: true, force: true });
 
 const sizeMB = (fs.statSync(outPath).size / (1024 * 1024)).toFixed(2);
-console.log(`Successfully generated: ${outPath} (${sizeMB} MB)`);
+console.log(`Successfully generated: ${outPath} (${sizeMB} MB) and deployed to index.html`);

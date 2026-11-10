@@ -2185,12 +2185,13 @@ def _sculpt_bishop(sc: DragonSculptor):
     )
 
     # PART_WEAPON_R (+X): FULL RIGHT S-CURVED DRAGON NECK & HORNED FANGED SKULL!
+    # Angled forward slightly to give dynamic predator poise while preserving majestic thickness
     r_neck_pts = [
         (Vector((0.11, 0.06, 0.94)), 0.082, 0.082),
-        (Vector((0.20, 0.04, 1.06)), 0.074, 0.076),
-        (Vector((0.24, 0.07, 1.20)), 0.068, 0.070),
-        (Vector((0.21, 0.14, 1.32)), 0.064, 0.066),
-        (Vector((0.17, 0.21, 1.38)), 0.062, 0.064),
+        (Vector((0.20, 0.06, 1.06)), 0.075, 0.076),
+        (Vector((0.24, 0.11, 1.18)), 0.069, 0.071),
+        (Vector((0.21, 0.19, 1.29)), 0.065, 0.067),
+        (Vector((0.17, 0.28, 1.35)), 0.063, 0.065),
     ]
     rn_frames = sc.add_lofted_spine(
         r_neck_pts, segs=10, dorsal_keel=0.34, uv_zone=UV_ZONE_SCALES, v_repeats=2, part_id=PART_WEAPON_R
@@ -2199,11 +2200,11 @@ def _sculpt_bishop(sc: DragonSculptor):
         rn_frames[:-1], count=5, len_start=0.072, len_end=0.052, r_base=0.018, sweep_back=0.45, radial_offset=0.055, part_id=PART_WEAPON_R
     )
     sc.add_anatomical_dragon_skull(
-        neck_pos=Vector((0.17, 0.21, 1.38)),
-        forward_dir=_safe_norm(Vector((-0.14, 0.95, -0.26))),
-        up_dir=_safe_norm(Vector((0.08, 0.26, 0.96))),
-        scale=0.80,
-        snout_stretch=1.04,
+        neck_pos=Vector((0.17, 0.28, 1.35)),
+        forward_dir=_safe_norm(Vector((-0.14, 0.93, -0.33))),
+        up_dir=_safe_norm(Vector((0.08, 0.33, 0.94))),
+        scale=0.82,
+        snout_stretch=1.02,
         jaw_open_deg=28.0,
         horn_len=0.28,
         horn_spread_deg=22.0,
@@ -2214,12 +2215,13 @@ def _sculpt_bishop(sc: DragonSculptor):
     )
 
     # PART_SHIELD_L (-X): FULL LEFT S-CURVED DRAGON NECK & HORNED FANGED SKULL!
+    # Angled forward slightly to give dynamic predator poise while preserving majestic thickness
     l_neck_pts = [
         (Vector((-0.11, 0.06, 0.93)), 0.082, 0.082),
-        (Vector((-0.21, 0.03, 1.04)), 0.074, 0.076),
-        (Vector((-0.24, 0.08, 1.18)), 0.068, 0.070),
-        (Vector((-0.20, 0.15, 1.29)), 0.064, 0.066),
-        (Vector((-0.17, 0.22, 1.34)), 0.062, 0.064),
+        (Vector((-0.21, 0.05, 1.04)), 0.075, 0.076),
+        (Vector((-0.24, 0.11, 1.16)), 0.069, 0.071),
+        (Vector((-0.20, 0.20, 1.27)), 0.065, 0.067),
+        (Vector((-0.17, 0.29, 1.32)), 0.063, 0.065),
     ]
     ln_frames = sc.add_lofted_spine(
         l_neck_pts, segs=10, dorsal_keel=0.34, uv_zone=UV_ZONE_SCALES, v_repeats=2, part_id=PART_SHIELD_L
@@ -2228,11 +2230,11 @@ def _sculpt_bishop(sc: DragonSculptor):
         ln_frames[:-1], count=5, len_start=0.072, len_end=0.052, r_base=0.018, sweep_back=0.45, radial_offset=0.055, part_id=PART_SHIELD_L
     )
     sc.add_anatomical_dragon_skull(
-        neck_pos=Vector((-0.17, 0.22, 1.34)),
-        forward_dir=_safe_norm(Vector((0.14, 0.94, -0.31))),
-        up_dir=_safe_norm(Vector((-0.08, 0.31, 0.95))),
-        scale=0.80,
-        snout_stretch=1.04,
+        neck_pos=Vector((-0.17, 0.29, 1.32)),
+        forward_dir=_safe_norm(Vector((0.14, 0.92, -0.37))),
+        up_dir=_safe_norm(Vector((-0.08, 0.37, 0.93))),
+        scale=0.82,
+        snout_stretch=1.02,
         jaw_open_deg=32.0,
         horn_len=0.28,
         horn_spread_deg=22.0,
