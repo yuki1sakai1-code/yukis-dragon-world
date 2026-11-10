@@ -1765,39 +1765,35 @@ class WizardsChessApp {
       this.syncBoardFromFEN();
     }
 
-    const survivedRepel = combatOutcome?.isCombat && !combatOutcome.destroyed;
-
-    if (!survivedRepel) {
-      // Castling Rook motion (if ever triggered)
-      if (moveObj.flags && (moveObj.flags.includes('k') || moveObj.flags.includes('q'))) {
-        const rank = moveObj.color === 'w' ? '1' : '7';
-        const rookFrom = moveObj.flags.includes('k') ? `g${rank}` : `a${rank}`;
-        const rookTo = moveObj.flags.includes('k') ? `e${rank}` : `c${rank}`;
-        const rookInst = this.pieceInstances.get(rookFrom);
-        if (rookInst) {
-          this.pieceInstances.delete(rookFrom);
-          rookInst.square = rookTo;
-          const rookPos = this.squareToWorld(rookTo);
-          rookPos.y += (rookInst.yOffset || 0);
-          rookInst.root.position.copy(rookPos);
-          this.pieceInstances.set(rookTo, rookInst);
-        }
+    // Castling Rook motion (if ever triggered)
+    if (moveObj.flags && (moveObj.flags.includes('k') || moveObj.flags.includes('q'))) {
+      const rank = moveObj.color === 'w' ? '1' : '7';
+      const rookFrom = moveObj.flags.includes('k') ? `g${rank}` : `a${rank}`;
+      const rookTo = moveObj.flags.includes('k') ? `e${rank}` : `c${rank}`;
+      const rookInst = this.pieceInstances.get(rookFrom);
+      if (rookInst) {
+        this.pieceInstances.delete(rookFrom);
+        rookInst.square = rookTo;
+        const rookPos = this.squareToWorld(rookTo);
+        rookPos.y += (rookInst.yOffset || 0);
+        rookInst.root.position.copy(rookPos);
+        this.pieceInstances.set(rookTo, rookInst);
       }
+    }
 
-      // Pawn Promotion transfiguration
-      if (moveObj.promotion) {
-        this._removePieceInstance(moveObj.to);
-        const promoted = this._createPieceInstance(moveObj.promotion, moveObj.color, moveObj.to);
-        if (promoted) {
-          this.pieceInstances.set(moveObj.to, promoted);
-          const promoPos = this.squareToWorld(moveObj.to);
-          promoPos.y += (promoted.yOffset || 0);
-          this.vfx.spawnShatterExplosion(
-            promoPos,
-            this._getPieceMaterial(moveObj.promotion, moveObj.color),
-            moveObj.color === 'w'
-          );
-        }
+    // Pawn Promotion transfiguration
+    if (moveObj.promotion) {
+      this._removePieceInstance(moveObj.to);
+      const promoted = this._createPieceInstance(moveObj.promotion, moveObj.color, moveObj.to);
+      if (promoted) {
+        this.pieceInstances.set(moveObj.to, promoted);
+        const promoPos = this.squareToWorld(moveObj.to);
+        promoPos.y += (promoted.yOffset || 0);
+        this.vfx.spawnShatterExplosion(
+          promoPos,
+          this._getPieceMaterial(moveObj.promotion, moveObj.color),
+          moveObj.color === 'w'
+        );
       }
     }
 
@@ -1809,8 +1805,7 @@ class WizardsChessApp {
       color: moveObj.color,
       piece: moveObj.piece,
       from: moveObj.from,
-      to: moveObj.to,
-      recoiled: Boolean(survivedRepel)
+      to: moveObj.to
     });
 
     this._logCombatMove(moveObj, combatOutcome);
@@ -1933,11 +1928,10 @@ class WizardsChessApp {
       this.sfx.playSwordStrikeAndShatter();
 
       const isTactics = this.combatRule === 'tactics';
-      let destroyed = true;
       let finalDamage = defender.maxHp;
 
       if (isTactics) {
-        // 攻撃側の攻撃力と、攻撃を受ける側の防御力で、攻撃力の上回った分だけHPが削られるシンプルな設計
+        // 攻撃側の攻撃力と、攻撃を受ける側の防御力で、攻撃力の上回った分だけHPが削られる設計
         const rawDiff = (attacker.atk || 0) - (defender.def || 0);
         finalDamage = Math.max(0, rawDiff);
 
@@ -1949,24 +1943,78 @@ class WizardsChessApp {
         if (this.selectedSquare === capturedSquare) {
           this._updateInspector(defender);
         }
-
-        destroyed = newHp <= 0;
       } else {
         defender.updateHp(0);
         this._spawnDamageNumber(defenderPos, defender.maxHp);
-        destroyed = true;
       }
 
-      if (destroyed) {
+      // 相手からの猛反撃ブレス (Counter-Attack)
+      let counterInfo = null;
+      let attackerDestroyed = false;
+
+      if (isTactics) {
+        const counterRaw = (defender.atk || 0) - (attacker.def || 0);
+        const counterDmg = Math.max(0, counterRaw);
+
+        defender.root.rotation.y = Math.atan2(toDef.x, toDef.z);
+        this._playPieceAnimation(defender, 'Attack', false);
+        await this._wait(170);
+        this.vfx.spawnDragonBreath(defenderPos, strikePos, defender.color === 'w');
+        await this._wait(220);
+
+        this._playPieceAnimation(attacker, 'Hit', false);
+        this.sfx.playSwordStrikeAndShatter();
+
+        const curAtkHp = attacker.hp !== undefined ? attacker.hp : attacker.maxHp;
+        const newAtkHp = Math.max(0, curAtkHp - counterDmg);
+        attacker.updateHp(newAtkHp);
+        this._spawnDamageNumber(strikePos, counterDmg);
+
+        attackerDestroyed = newAtkHp <= 0;
+        counterInfo = {
+          damage: counterDmg,
+          defenderAtk: defender.atk,
+          attackerDef: attacker.def,
+          attackerDestroyed,
+          attackerRemainHp: attacker.hp,
+          attackerMaxHp: attacker.maxHp
+        };
+
+        await this._wait(200);
+      }
+
+      // 防御側は粉砕消滅し、そのマスを明け渡す（チェス本来の討滅）
+      this.vfx.spawnShatterExplosion(
+        defenderPos,
+        this._getPieceMaterial(defender.type, defender.color),
+        defender.color === 'w'
+      );
+      await this._wait(260);
+      this._removePieceInstance(capturedSquare);
+
+      if (defender.type === 'k') {
+        this._kingSlain = defender.color;
+      }
+
+      // チェスのように自分のターンに1コマ動かす: 攻撃・防御コマが自動で下がるロジックは一切なし
+      if (attackerDestroyed) {
+        // 反撃で相打ち粉砕された場合
         this.vfx.spawnShatterExplosion(
-          defenderPos,
-          this._getPieceMaterial(defender.type, defender.color),
-          defender.color === 'w'
+          strikePos,
+          this._getPieceMaterial(attacker.type, attacker.color),
+          attacker.color === 'w'
         );
-
         await this._wait(260);
-        this._removePieceInstance(capturedSquare);
+        this._removePieceInstance(moveObj.from);
 
+        const toCoords = this.chess._squareToCoords(moveObj.to);
+        this.chess._board[toCoords.r][toCoords.c] = null;
+
+        if (attacker.type === 'k') {
+          this._kingSlain = attacker.color;
+        }
+      } else {
+        // 攻撃側は必ず目標マス（相手のマス）へ進軍し、そこに留まる（下がることは絶対にない）
         this._playPieceAnimation(attacker, 'Move', true);
         await this._tweenPosition(attacker.root, strikePos, targetPos, 0.28, false);
         attacker.root.rotation.y = attacker.defaultYaw;
@@ -1978,124 +2026,25 @@ class WizardsChessApp {
           if (c.isMesh) c.userData.square = moveObj.to;
         });
         this.pieceInstances.set(moveObj.to, attacker);
-
-        if (defender.type === 'k') {
-          this._kingSlain = defender.color;
-        }
-
-        if (this.savedCameraState) {
-          await this._wait(250);
-          this._tweenCamera(this.savedCameraState.pos, this.savedCameraState.target, 0.55);
-          this.savedCameraState = null;
-        }
-
-        return {
-          isCombat: true,
-          destroyed: true,
-          damage: finalDamage,
-          attackerAtk: attacker.atk,
-          defenderDef: defender.def,
-          victim: defender.type,
-          remainHp: 0,
-          maxHp: defender.maxHp
-        };
-      } else {
-        // Defender withstood the onslaught!
-        await this._wait(240);
-
-        let counterInfo = null;
-        let attackerDestroyed = false;
-
-        if (isTactics) {
-          // Counter-Attack: Defender unleashes furious retaliation!
-          const counterRaw = (defender.atk || 0) - (attacker.def || 0);
-          const counterDmg = Math.max(0, counterRaw);
-
-          defender.root.rotation.y = Math.atan2(toDef.x, toDef.z);
-          this._playPieceAnimation(defender, 'Attack', false);
-          await this._wait(170);
-          this.vfx.spawnDragonBreath(defenderPos, strikePos, defender.color === 'w');
-          await this._wait(220);
-
-          this._playPieceAnimation(attacker, 'Hit', false);
-          this.sfx.playSwordStrikeAndShatter();
-
-          const curAtkHp = attacker.hp !== undefined ? attacker.hp : attacker.maxHp;
-          const newAtkHp = Math.max(0, curAtkHp - counterDmg);
-          attacker.updateHp(newAtkHp);
-          this._spawnDamageNumber(strikePos, counterDmg);
-
-          attackerDestroyed = newAtkHp <= 0;
-          counterInfo = {
-            damage: counterDmg,
-            defenderAtk: defender.atk,
-            attackerDef: attacker.def,
-            attackerDestroyed,
-            attackerRemainHp: attacker.hp,
-            attackerMaxHp: attacker.maxHp
-          };
-
-          await this._wait(240);
-        }
-
-        defender.root.rotation.y = defender.defaultYaw;
-        this._playPieceAnimation(defender, 'Idle', true);
-
-        if (attackerDestroyed) {
-          // Attacker is shattered by the fierce counter-attack!
-          this.vfx.spawnShatterExplosion(
-            strikePos,
-            this._getPieceMaterial(attacker.type, attacker.color),
-            attacker.color === 'w'
-          );
-          await this._wait(260);
-          this._removePieceInstance(moveObj.from);
-
-          if (attacker.type === 'k') {
-            this._kingSlain = attacker.color;
-          }
-
-          // Undo move and remove attacker piece from chess engine board
-          this.chess.undo();
-          const fromCoords = this.chess._squareToCoords(moveObj.from);
-          this.chess._board[fromCoords.r][fromCoords.c] = null;
-          this.chess._turn = this.chess._turn === 'w' ? 'b' : 'w';
-          if (this.chess._turn === 'w') {
-            this.chess._fullMoves++;
-          }
-        } else {
-          // Attacker survives the counter-attack and retreats to original square
-          this._playPieceAnimation(attacker, 'Move', true);
-          await this._tweenPosition(attacker.root, strikePos, startPos, 0.32, false);
-          attacker.root.rotation.y = attacker.defaultYaw;
-          this._playPieceAnimation(attacker, 'Idle', true);
-
-          // Undo move in engine and hand turn over to opponent
-          this.chess.undo();
-          this.chess._turn = this.chess._turn === 'w' ? 'b' : 'w';
-          if (this.chess._turn === 'w') {
-            this.chess._fullMoves++;
-          }
-        }
-
-        if (this.savedCameraState) {
-          await this._wait(250);
-          this._tweenCamera(this.savedCameraState.pos, this.savedCameraState.target, 0.55);
-          this.savedCameraState = null;
-        }
-
-        return {
-          isCombat: true,
-          destroyed: false,
-          damage: finalDamage,
-          attackerAtk: attacker.atk,
-          defenderDef: defender.def,
-          victim: defender.type,
-          remainHp: defender.hp,
-          maxHp: defender.maxHp,
-          counter: counterInfo
-        };
       }
+
+      if (this.savedCameraState) {
+        await this._wait(250);
+        this._tweenCamera(this.savedCameraState.pos, this.savedCameraState.target, 0.55);
+        this.savedCameraState = null;
+      }
+
+      return {
+        isCombat: true,
+        destroyed: true,
+        damage: finalDamage,
+        attackerAtk: attacker.atk,
+        defenderDef: defender.def,
+        victim: defender.type,
+        remainHp: 0,
+        maxHp: defender.maxHp,
+        counter: counterInfo
+      };
     } else {
       const dur = Math.min(0.75, Math.max(0.38, distance * 0.14));
       this._playPieceAnimation(attacker, 'Move', true);
