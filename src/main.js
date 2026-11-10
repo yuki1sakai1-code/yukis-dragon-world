@@ -803,7 +803,7 @@ class WizardsChessApp {
       updateProgress(68, '崩れた石畳と古代ルーン聖痕フィールドを展開中...');
       this._buildInteractiveBoard();
 
-      updateProgress(82, '6種の純ドラゴン骨格・2K竜鱗石彫アセットを覚醒中...');
+      updateProgress(82, 'ドラゴンたちを呼び覚まし中...');
       const pieceMap = [
         ['p', '/assets/models/pawn.glb'],
         ['r', '/assets/models/rook.glb'],
