@@ -218,6 +218,7 @@ class WizardsChessApp {
       160
     );
     this.camera.position.set(0, 8.2, 11.6);
+    this._adjustCameraForViewport();
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -334,9 +335,9 @@ class WizardsChessApp {
     // 4 Corner Dragon-Head Brazier Fire PointLights around the Ruined Dragon Sanctum Altar
     const brazierCoords = [
       [-5.35, 1.52, -5.35],
-      [ 5.35, 1.52, -5.35],
-      [-5.35, 1.52,  5.35],
-      [ 5.35, 1.52,  5.35]
+      [5.35, 1.52, -5.35],
+      [-5.35, 1.52, 5.35],
+      [5.35, 1.52, 5.35]
     ];
     this.lights.braziers = [];
     for (const [bx, by, bz] of brazierCoords) {
@@ -356,6 +357,11 @@ class WizardsChessApp {
   }
 
   setLightingPreset(preset) {
+    const topLight = document.getElementById('lighting-select');
+    const mobLight = document.getElementById('mobile-lighting-select');
+    if (topLight && topLight.value !== preset) topLight.value = preset;
+    if (mobLight && mobLight.value !== preset) mobLight.value = preset;
+
     if (preset === 'candlelight') {
       this.scene.background.setHex(0x09080e);
       this.scene.fog.color.setHex(0x0b0a12);
@@ -827,23 +833,23 @@ class WizardsChessApp {
         bAlbedo, bNormal, bRough, bMetal, bAO, bEmissive,
         tAlbedo, tNormal, tRough, tMetal, tAO
       ] = await Promise.all([
-        loadTex('/assets/textures/white_piece_albedo.png',    { isColor: true,  flipY: false }),
-        loadTex('/assets/textures/white_piece_normal.png',    { isColor: false, flipY: false }),
+        loadTex('/assets/textures/white_piece_albedo.png', { isColor: true, flipY: false }),
+        loadTex('/assets/textures/white_piece_normal.png', { isColor: false, flipY: false }),
         loadTex('/assets/textures/white_piece_roughness.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/white_piece_metallic.png',  { isColor: false, flipY: false }),
-        loadTex('/assets/textures/white_piece_ao.png',        { isColor: false, flipY: false }),
-        loadTex('/assets/textures/white_piece_emission.png',  { isColor: true,  flipY: false }),
-        loadTex('/assets/textures/black_piece_albedo.png',    { isColor: true,  flipY: false }),
-        loadTex('/assets/textures/black_piece_normal.png',    { isColor: false, flipY: false }),
+        loadTex('/assets/textures/white_piece_metallic.png', { isColor: false, flipY: false }),
+        loadTex('/assets/textures/white_piece_ao.png', { isColor: false, flipY: false }),
+        loadTex('/assets/textures/white_piece_emission.png', { isColor: true, flipY: false }),
+        loadTex('/assets/textures/black_piece_albedo.png', { isColor: true, flipY: false }),
+        loadTex('/assets/textures/black_piece_normal.png', { isColor: false, flipY: false }),
         loadTex('/assets/textures/black_piece_roughness.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/black_piece_metallic.png',  { isColor: false, flipY: false }),
-        loadTex('/assets/textures/black_piece_ao.png',        { isColor: false, flipY: false }),
-        loadTex('/assets/textures/black_piece_emission.png',  { isColor: true,  flipY: false }),
-        loadTex('/assets/textures/board_tiles_albedo.png',    { isColor: true,  flipY: true }),
-        loadTex('/assets/textures/board_tiles_normal.png',    { isColor: false, flipY: true }),
+        loadTex('/assets/textures/black_piece_metallic.png', { isColor: false, flipY: false }),
+        loadTex('/assets/textures/black_piece_ao.png', { isColor: false, flipY: false }),
+        loadTex('/assets/textures/black_piece_emission.png', { isColor: true, flipY: false }),
+        loadTex('/assets/textures/board_tiles_albedo.png', { isColor: true, flipY: true }),
+        loadTex('/assets/textures/board_tiles_normal.png', { isColor: false, flipY: true }),
         loadTex('/assets/textures/board_tiles_roughness.png', { isColor: false, flipY: true }),
-        loadTex('/assets/textures/board_tiles_metallic.png',  { isColor: false, flipY: true }),
-        loadTex('/assets/textures/board_tiles_ao.png',        { isColor: false, flipY: true })
+        loadTex('/assets/textures/board_tiles_metallic.png', { isColor: false, flipY: true }),
+        loadTex('/assets/textures/board_tiles_ao.png', { isColor: false, flipY: true })
       ]);
 
       // Construct 2K Carved Dragon-Stonework PBR Materials for White & Black Factions
@@ -2470,7 +2476,10 @@ class WizardsChessApp {
         chip.type = 'button';
         chip.className = 'quick-spell-chip';
         chip.textContent = m.captured ? `⚔️ ${m.san}` : m.san;
-        chip.addEventListener('click', () => this.executeMove(m));
+        chip.addEventListener('click', () => {
+          if (window.innerWidth <= 960) this._closeMobileDrawers?.();
+          this.executeMove(m);
+        });
         quickSpellsEl.appendChild(chip);
       }
     }
@@ -2564,10 +2573,79 @@ class WizardsChessApp {
     modal.classList.remove('hidden');
   }
 
+  _adjustCameraForViewport() {
+    if (!this.camera) return;
+    const aspect = window.innerWidth / window.innerHeight;
+    if (aspect < 1.0) {
+      // モバイル縦画面など幅が狭い時は、盤面の左右端が切れないよう垂直FOVを自動拡張
+      const baseTanHalfFov = Math.tan(THREE.MathUtils.degToRad(44 / 2));
+      const desiredHorizontalFactor = baseTanHalfFov * 1.05;
+      const dynamicTan = desiredHorizontalFactor / Math.max(0.42, aspect);
+      const dynamicFov = Math.min(83, Math.max(44, THREE.MathUtils.radToDeg(2 * Math.atan(dynamicTan))));
+      this.camera.fov = dynamicFov;
+    } else {
+      this.camera.fov = 44;
+    }
+    this.camera.aspect = aspect;
+    this.camera.updateProjectionMatrix();
+  }
+
   _bindUIEvents() {
+    const isMobileView = () => window.innerWidth <= 960;
+    const leftPanel = document.getElementById('left-panel');
+    const rightPanel = document.getElementById('right-panel');
+    const drawerBackdrop = document.getElementById('mobile-drawer-backdrop');
+    const mobileLeftBtn = document.getElementById('btn-mobile-left');
+    const mobileRightBtn = document.getElementById('btn-mobile-right');
+
+    const closeMobileDrawers = () => {
+      leftPanel?.classList.remove('mobile-open');
+      rightPanel?.classList.remove('mobile-open');
+      drawerBackdrop?.classList.add('hidden');
+      mobileLeftBtn?.classList.remove('active');
+      mobileRightBtn?.classList.remove('active');
+    };
+    this._closeMobileDrawers = closeMobileDrawers;
+
+    const toggleMobileDrawer = (side) => {
+      const targetPanel = side === 'left' ? leftPanel : rightPanel;
+      const otherPanel = side === 'left' ? rightPanel : leftPanel;
+      const targetBtn = side === 'left' ? mobileLeftBtn : mobileRightBtn;
+      const otherBtn = side === 'left' ? mobileRightBtn : mobileLeftBtn;
+      if (!targetPanel) return;
+
+      const willOpen = !targetPanel.classList.contains('mobile-open');
+      otherPanel?.classList.remove('mobile-open');
+      otherBtn?.classList.remove('active');
+
+      if (willOpen) {
+        targetPanel.classList.add('mobile-open');
+        targetBtn?.classList.add('active');
+        drawerBackdrop?.classList.remove('hidden');
+      } else {
+        targetPanel.classList.remove('mobile-open');
+        targetBtn?.classList.remove('active');
+        drawerBackdrop?.classList.add('hidden');
+      }
+    };
+
+    mobileLeftBtn?.addEventListener('click', () => toggleMobileDrawer('left'));
+    mobileRightBtn?.addEventListener('click', () => toggleMobileDrawer('right'));
+    drawerBackdrop?.addEventListener('click', closeMobileDrawers);
+    document.querySelectorAll('[data-close-drawer]').forEach((btn) => {
+      btn.addEventListener('click', closeMobileDrawers);
+    });
+
+    document.getElementById('btn-mobile-undo')?.addEventListener('click', () => {
+      document.getElementById('btn-undo')?.click();
+    });
+    document.getElementById('btn-mobile-hint')?.addEventListener('click', () => {
+      document.getElementById('btn-hint')?.click();
+    });
+
     window.addEventListener('resize', () => {
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
+      this._adjustCameraForViewport();
+      if (!isMobileView()) closeMobileDrawers();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
       this.composer.setSize(window.innerWidth, window.innerHeight);
     });
@@ -2580,7 +2658,8 @@ class WizardsChessApp {
     dom.addEventListener('pointerup', (e) => {
       if (e.button !== 0) return;
       const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
-      if (dist > 6) return;
+      const maxDragDist = e.pointerType === 'touch' ? 14 : 6;
+      if (dist > maxDragDist) return;
 
       const rect = dom.getBoundingClientRect();
       this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -2604,9 +2683,9 @@ class WizardsChessApp {
     });
 
     const camPresets = {
-      white:     { pos: new THREE.Vector3(0, 8.2, 11.6),  target: new THREE.Vector3(0, 0.65, 0) },
-      black:     { pos: new THREE.Vector3(0, 8.2, -11.6), target: new THREE.Vector3(0, 0.65, 0) },
-      overhead:  { pos: new THREE.Vector3(0, 15.2, 0.01), target: new THREE.Vector3(0, 0, 0) },
+      white: { pos: new THREE.Vector3(0, 8.2, 11.6), target: new THREE.Vector3(0, 0.65, 0) },
+      black: { pos: new THREE.Vector3(0, 8.2, -11.6), target: new THREE.Vector3(0, 0.65, 0) },
+      overhead: { pos: new THREE.Vector3(0, 15.2, 0.01), target: new THREE.Vector3(0, 0, 0) },
       cathedral: { pos: new THREE.Vector3(7.2, 3.5, 14.8), target: new THREE.Vector3(0, 4.4, -9.0) }
     };
 
@@ -2620,6 +2699,7 @@ class WizardsChessApp {
         } else if (camPresets[camKey]) {
           this._tweenCamera(camPresets[camKey].pos, camPresets[camKey].target, 0.75);
         }
+        if (isMobileView()) closeMobileDrawers();
       });
     });
 
@@ -2659,8 +2739,13 @@ class WizardsChessApp {
       this.setCombatRule('classic');
     });
 
-    document.getElementById('game-mode-select')?.addEventListener('change', (e) => {
-      this.gameMode = e.target.value;
+    const applyGameMode = (modeVal) => {
+      this.gameMode = modeVal;
+      const topSel = document.getElementById('game-mode-select');
+      const mobSel = document.getElementById('mobile-game-mode-select');
+      if (topSel && topSel.value !== modeVal) topSel.value = modeVal;
+      if (mobSel && mobSel.value !== modeVal) mobSel.value = modeVal;
+
       const wRole = document.getElementById('white-role-label');
       const bRole = document.getElementById('black-role-label');
       if (this.gameMode === 'pva') {
@@ -2674,13 +2759,35 @@ class WizardsChessApp {
         if (bRole) bRole.textContent = 'Obsidian Brood • AI';
       }
       this._maybeTriggerAITurn();
+    };
+
+    document.getElementById('game-mode-select')?.addEventListener('change', (e) => {
+      applyGameMode(e.target.value);
+    });
+    document.getElementById('mobile-game-mode-select')?.addEventListener('change', (e) => {
+      applyGameMode(e.target.value);
     });
 
+    const applyAiDepth = (val) => {
+      const depth = parseInt(val, 10) || 2;
+      this.aiDepth = depth;
+      const topSel = document.getElementById('ai-depth-select');
+      const mobSel = document.getElementById('mobile-ai-depth-select');
+      if (topSel && topSel.value !== String(depth)) topSel.value = String(depth);
+      if (mobSel && mobSel.value !== String(depth)) mobSel.value = String(depth);
+    };
+
     document.getElementById('ai-depth-select')?.addEventListener('change', (e) => {
-      this.aiDepth = parseInt(e.target.value, 10) || 2;
+      applyAiDepth(e.target.value);
+    });
+    document.getElementById('mobile-ai-depth-select')?.addEventListener('change', (e) => {
+      applyAiDepth(e.target.value);
     });
 
     document.getElementById('lighting-select')?.addEventListener('change', (e) => {
+      this.setLightingPreset(e.target.value);
+    });
+    document.getElementById('mobile-lighting-select')?.addEventListener('change', (e) => {
       this.setLightingPreset(e.target.value);
     });
 
@@ -2727,6 +2834,7 @@ class WizardsChessApp {
     window.addEventListener('keydown', unlockAudio, { passive: true });
 
     const toggleHUD = () => {
+      closeMobileDrawers();
       document.getElementById('ui-root')?.classList.toggle('hud-minimized');
     };
     document.getElementById('btn-toggle-ui')?.addEventListener('click', toggleHUD);
@@ -2745,17 +2853,20 @@ class WizardsChessApp {
       if (ok) {
         input.value = '';
         if (toast) toast.textContent = '⚡ 竜語号令成功！石造ドラゴンが進撃します。';
+        if (isMobileView()) closeMobileDrawers();
       } else if (toast) {
         toast.textContent = `⚠️ 「${input.value}」は現在の局面で無効な号令です (例: e4, Nf3, ワイバーン f3)`;
       }
     });
 
     document.getElementById('btn-battle-demo')?.addEventListener('click', () => {
+      if (isMobileView()) closeMobileDrawers();
       this.triggerBattleDemo();
     });
 
     const resetMatch = () => {
       if (this.isBusy) return;
+      if (isMobileView()) closeMobileDrawers();
       const scenKey = document.getElementById('scenario-select')?.value || 'endgame';
       const scenFen = SCENARIOS[scenKey];
       if (scenFen) {
@@ -2790,6 +2901,7 @@ class WizardsChessApp {
 
     document.getElementById('btn-undo')?.addEventListener('click', () => {
       if (this.isBusy) return;
+      if (isMobileView()) closeMobileDrawers();
       this.chess.undo();
       this.moveActionLog.pop();
       if (this.gameMode === 'pva' && this.chess.turn() === 'b') {
@@ -2805,6 +2917,7 @@ class WizardsChessApp {
 
     document.getElementById('btn-hint')?.addEventListener('click', () => {
       if (this.isBusy || this.chess.isGameOver()) return;
+      if (isMobileView()) closeMobileDrawers();
       const isForbidden = (m) => this._isRepetitionForbidden(m) || this.collapsedSquares.has(m.to);
       const best = chooseBestMove(this.chess, 2, isForbidden);
       if (best) {
@@ -2818,6 +2931,7 @@ class WizardsChessApp {
     });
 
     document.getElementById('btn-cataclysm-demo')?.addEventListener('click', () => {
+      if (isMobileView()) closeMobileDrawers();
       this.triggerCataclysm();
     });
 
@@ -2850,6 +2964,7 @@ class WizardsChessApp {
 
     document.getElementById('scenario-select')?.addEventListener('change', (e) => {
       if (this.isBusy) return;
+      if (isMobileView()) closeMobileDrawers();
       const key = e.target.value;
       const fen = SCENARIOS[key];
       if (fen) {

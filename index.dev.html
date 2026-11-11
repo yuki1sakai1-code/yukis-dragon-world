@@ -54,6 +54,9 @@
 
   <!-- Unified Gothic Cathedral & Stone-Dragon Sanctum HUD -->
   <div id="ui-root" class="ui-root">
+    <!-- Mobile Drawer Backdrop -->
+    <div id="mobile-drawer-backdrop" class="mobile-drawer-backdrop hidden"></div>
+
     <!-- Top Gothic Pointed-Arch Header -->
     <header class="top-hud gothic-stone-panel">
       <div class="brand-block">
@@ -130,6 +133,10 @@
 
     <!-- Left Column: Dragon Broods, Clocks, Shattered Relics & Sanctum Chronicle -->
     <aside class="side-panel left-panel gothic-stone-panel" id="left-panel">
+      <div class="mobile-drawer-header">
+        <span>📜 戦況・聖域竜戦クロニクル</span>
+        <button type="button" class="gothic-btn mobile-close-btn" data-close-drawer>✕ 閉じる</button>
+      </div>
       <!-- Black Obsidian Dragon Brood Card -->
       <div class="player-card black-card" id="card-black">
         <div class="player-header">
@@ -182,6 +189,44 @@
 
     <!-- Right Column: Sanctum Cameras, Dragon Command, Stone-Dragon Anatomy Inspector & Scenarios -->
     <aside class="side-panel right-panel gothic-stone-panel" id="right-panel">
+      <div class="mobile-drawer-header">
+        <span>⚙️ 設定・カメラ・コマンド</span>
+        <button type="button" class="gothic-btn mobile-close-btn" data-close-drawer>✕ 閉じる</button>
+      </div>
+
+      <!-- Mobile-only Quick Sanctum Controls (Syncs with top bar) -->
+      <div class="panel-section mobile-only-section">
+        <div class="section-header">
+          <h2>🏰 聖域環境・AI設定</h2>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+          <div class="control-group">
+            <label for="mobile-game-mode-select">聖域決戦モード</label>
+            <select id="mobile-game-mode-select" class="gothic-select full-width">
+              <option value="pva" selected>対AI導師 (PvE)</option>
+              <option value="pvp">双竜対戦 (PvP)</option>
+              <option value="ava">AI観戦 (AIvsAI)</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="mobile-ai-depth-select">古竜AI知略</label>
+            <select id="mobile-ai-depth-select" class="gothic-select full-width">
+              <option value="1">幼竜 (高速)</option>
+              <option value="2" selected>飛竜 (標準)</option>
+              <option value="3">覇王 (強敵)</option>
+            </select>
+          </div>
+        </div>
+        <div class="control-group" style="margin-top: 4px;">
+          <label for="mobile-lighting-select">大聖堂照明</label>
+          <select id="mobile-lighting-select" class="gothic-select full-width">
+            <option value="candlelight">竜火の篝火 (Torchlight)</option>
+            <option value="moonlit" selected>薔薇窓の月光 (Moonlit)</option>
+            <option value="bloodmoon">紅蓮の竜月 (Blood Moon)</option>
+          </select>
+        </div>
+      </div>
+
       <!-- Camera Sanctum Views -->
       <div class="panel-section">
         <div class="section-header">
@@ -387,6 +432,12 @@
 
     <!-- Bottom Center Status / Coordinate Toast -->
     <footer class="bottom-hud">
+      <div class="mobile-dock" id="mobile-dock">
+        <button type="button" id="btn-mobile-left" class="gothic-btn mobile-dock-btn">📜 戦況・記録</button>
+        <button type="button" id="btn-mobile-undo" class="gothic-btn mobile-dock-btn">↩️ 待った</button>
+        <button type="button" id="btn-mobile-hint" class="gothic-btn mobile-dock-btn">🔮 神託</button>
+        <button type="button" id="btn-mobile-right" class="gothic-btn gold-btn mobile-dock-btn">⚙️ 設定・視点</button>
+      </div>
       <div class="status-pill gothic-stone-panel" id="status-toast">
         左クリック: 石造ドラゴンの選択・ルーン聖痕へ進撃 ／ ドラッグ: 聖堂回転 ／ 右ドラッグ: 平行移動 ／ ホイール: ズーム
       </div>
