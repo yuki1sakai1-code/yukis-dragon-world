@@ -36,8 +36,11 @@ jobs:
 
       - name: Build with Vite
         run: |
+          cp index.dev.html index.html
           npm run build
-          cp wizards-chess-standalone.html dist/index.html
+          rm -rf dist/assets/renders
+          rm -f dist/assets/models/gothic_cathedral.glb
+          rm -f dist/assets/textures/*.png
           cp wizards-chess-standalone.html dist/wizards-chess-standalone.html
 
       - name: Setup Pages

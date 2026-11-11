@@ -25,18 +25,20 @@ export class SoundEffects {
   initBGM(sourceUrl) {
     if (this.bgmAudio) return;
 
-    let src = sourceUrl || '/assets/audio/Beyond_the_Great_Crest.mp3';
-    // Embedded standalone asset support
-    if (window.__EMBEDDED_ASSETS__?.audio?.['Beyond_the_Great_Crest.mp3']) {
-      src = window.__EMBEDDED_ASSETS__.audio['Beyond_the_Great_Crest.mp3'];
-    }
+    const embeddedAudio = window.__EMBEDDED_ASSETS__?.audio;
+    let src =
+      embeddedAudio?.['Beyond_the_Great_Crest.mp3'] ||
+      embeddedAudio?.['./assets/audio/Beyond_the_Great_Crest.mp3'] ||
+      embeddedAudio?.['/assets/audio/Beyond_the_Great_Crest.mp3'] ||
+      sourceUrl ||
+      './assets/audio/Beyond_the_Great_Crest.mp3';
 
     try {
       this.bgmAudio = new Audio();
       this.bgmAudio.src = src;
       this.bgmAudio.loop = true;
       this.bgmAudio.volume = this.bgmVolume;
-      this.bgmAudio.preload = 'auto';
+      this.bgmAudio.preload = 'none';
     } catch (e) {
       console.warn('Failed to initialize BGM audio element:', e);
     }

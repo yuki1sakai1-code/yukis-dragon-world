@@ -2,8 +2,9 @@
 import * as THREE from 'three';
 
 export class VFXManager {
-  constructor(scene) {
+  constructor(scene, options = {}) {
     this.scene = scene;
+    this.isMobile = Boolean(options.isMobile);
     this.shards = [];
     this.shockwaves = [];
     this.sparks = [];
@@ -54,7 +55,7 @@ export class VFXManager {
   }
 
   _initCathedralMotes() {
-    const count = 440;
+    const count = this.isMobile ? 200 : 440;
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const phases = new Float32Array(count);
@@ -132,10 +133,14 @@ export class VFXManager {
   }
 
   _initSanctumRuneCircle() {
+    const size = this.isMobile ? 512 : 1024;
     const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1024;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext('2d');
+    if (this.isMobile) {
+      ctx.scale(0.5, 0.5);
+    }
     const cx = 512;
     const cy = 512;
 

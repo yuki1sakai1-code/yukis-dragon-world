@@ -827,6 +827,13 @@ html, body {
 
 /* モバイル・タブレット縦画面用の完全レスポンシブ＆ドロワーUI (960px以下) */
 @media (max-width: 960px) {
+  /* モバイルWebKitでWebGLキャンバス上のbackdrop-filterがGPUクラッシュを起こすため無効化 */
+  .gothic-stone-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(14, 13, 18, 0.94);
+  }
+
   .loading-title {
     font-size: 1.48rem;
   }
@@ -947,7 +954,8 @@ html, body {
     overscroll-behavior: contain;
     pointer-events: none;
     opacity: 0;
-    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
+    visibility: hidden;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, visibility 0s linear 0.28s;
   }
 
   .left-panel {
@@ -963,7 +971,9 @@ html, body {
   .side-panel.mobile-open {
     transform: translateX(0);
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
+    transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease, visibility 0s linear 0s;
   }
 
   .mobile-drawer-header {
@@ -996,9 +1006,7 @@ html, body {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(4, 3, 8, 0.65);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: rgba(4, 3, 8, 0.72);
     z-index: 40;
     pointer-events: auto;
   }

@@ -205,6 +205,11 @@ class WizardsChessApp {
     this.clocks = { w: 600, b: 600 };
     this.lastClockTick = performance.now();
 
+    // Mobile capability detection to constrain WebGL VRAM & post-processing overhead (prevents iOS Safari Jetsam crashes)
+    const isCoarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    const isMobileUA = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+    this.isMobileDevice = window.innerWidth <= 960 || isCoarsePointer || isMobileUA;
+
     // Three.js Core
     this.container = document.getElementById('canvas-container');
     this.scene = new THREE.Scene();
@@ -221,31 +226,46 @@ class WizardsChessApp {
     this._adjustCameraForViewport();
 
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      powerPreference: 'high-performance',
-      preserveDrawingBuffer: true
+      antialias: !this.isMobileDevice,
+      powerPreference: this.isMobileDevice ? 'default' : 'high-performance',
+      preserveDrawingBuffer: false
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.isMobileDevice ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = this.isMobileDevice ? 1.22 : 1.15;
     this.container.appendChild(this.renderer.domElement);
 
-    // Post-processing Subtle Bloom (tuned so stone stays crisp & runes/stained-glass glow cleanly)
-    this.composer = new EffectComposer(this.renderer);
-    this.renderPass = new RenderPass(this.scene, this.camera);
-    this.composer.addPass(this.renderPass);
-
-    this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.24, // strength
-      0.42, // radius
-      0.90  // threshold
+    this.renderer.domElement.addEventListener(
+      'webglcontextlost',
+      (e) => {
+        e.preventDefault();
+        console.warn('WebGL context lost — awaiting restore');
+      },
+      false
     );
-    this.composer.addPass(this.bloomPass);
-    this.composer.addPass(new OutputPass());
+
+    if (!this.isMobileDevice) {
+      // Post-processing Subtle Bloom (tuned so stone stays crisp & runes/stained-glass glow cleanly)
+      this.composer = new EffectComposer(this.renderer);
+      this.renderPass = new RenderPass(this.scene, this.camera);
+      this.composer.addPass(this.renderPass);
+
+      this.bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.24, // strength
+        0.42, // radius
+        0.90  // threshold
+      );
+      this.composer.addPass(this.bloomPass);
+      this.composer.addPass(new OutputPass());
+    } else {
+      this.composer = null;
+      this.renderPass = null;
+      this.bloomPass = null;
+    }
 
     // Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -283,7 +303,7 @@ class WizardsChessApp {
     this.chess.load(SCENARIOS.endgame);
 
     // VFX & Lighting
-    this.vfx = new VFXManager(this.scene);
+    this.vfx = new VFXManager(this.scene, { isMobile: this.isMobileDevice });
     this.lights = {};
 
     this.clock = new THREE.Clock();
@@ -307,8 +327,9 @@ class WizardsChessApp {
     const dirLight = new THREE.DirectionalLight(0xffe6c2, 2.25);
     dirLight.position.set(7.8, 14.2, 9.4);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
+    const shadowSize = this.isMobileDevice ? 1024 : 2048;
+    dirLight.shadow.mapSize.width = shadowSize;
+    dirLight.shadow.mapSize.height = shadowSize;
     dirLight.shadow.camera.near = 1.0;
     dirLight.shadow.camera.far = 42.0;
     const d = 10.2;
@@ -779,6 +800,33 @@ class WizardsChessApp {
     }
   }
 
+  _downscaleTextureForMobile(tex, maxDim = 1024) {
+    if (!this.isMobileDevice || !tex?.image) return tex;
+    const img = tex.image;
+    const w = img.naturalWidth || img.width || 0;
+    const h = img.naturalHeight || img.height || 0;
+    if (!w || !h || (w <= maxDim && h <= maxDim)) return tex;
+
+    const scale = maxDim / Math.max(w, h);
+    const nw = Math.max(1, Math.round(w * scale));
+    const nh = Math.max(1, Math.round(h * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = nw;
+    canvas.height = nh;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, nw, nh);
+      if (typeof img.close === 'function') {
+        try { img.close(); } catch {}
+      }
+      tex.image = canvas;
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.needsUpdate = true;
+    }
+    return tex;
+  }
+
   async _initAssets() {
     const statusEl = document.getElementById('loading-status');
     const barEl = document.getElementById('loading-bar-fill');
@@ -789,11 +837,27 @@ class WizardsChessApp {
 
     const texLoader = new THREE.TextureLoader();
     const gltfLoader = new GLTFLoader();
-    const maxAniso = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    const rawMaxAniso = this.renderer.capabilities.getMaxAnisotropy();
+    const maxAniso = this.isMobileDevice ? Math.min(2, rawMaxAniso) : Math.min(8, rawMaxAniso);
 
-    const loadTex = (url, { isColor = true, flipY = true } = {}) =>
-      new Promise((resolve) => {
-        const src = window.__EMBEDDED_ASSETS__?.textures?.[url] || url;
+    const consumeEmbedded = (bucket, url) => {
+      const store = window.__EMBEDDED_ASSETS__?.[bucket];
+      if (!store) return null;
+      const slashUrl = url.replace(/^\.\//, '/');
+      const dotUrl = url.startsWith('./') ? url : `./${url.replace(/^\//, '')}`;
+      const baseName = url.split('/').pop();
+      for (const key of [url, slashUrl, dotUrl, baseName]) {
+        if (store[key]) {
+          const val = store[key];
+          delete store[key];
+          return val;
+        }
+      }
+      return null;
+    };
+
+    const loadTexSingle = (src, { isColor = true, flipY = true, mobileMaxDim = 1024 } = {}) =>
+      new Promise((resolve, reject) => {
         texLoader.load(
           src,
           (tex) => {
@@ -802,55 +866,82 @@ class WizardsChessApp {
             tex.wrapT = THREE.RepeatWrapping;
             if (isColor) tex.colorSpace = THREE.SRGBColorSpace;
             tex.anisotropy = maxAniso;
+            this._downscaleTextureForMobile(tex, mobileMaxDim);
             tex.needsUpdate = true;
             resolve(tex);
           },
           undefined,
-          () => resolve(null)
+          reject
         );
       });
 
-    const loadGLB = (url) =>
-      new Promise((resolve, reject) => {
-        const b64 = window.__EMBEDDED_ASSETS__?.models?.[url];
-        if (b64) {
-          const binStr = atob(b64);
-          const len = binStr.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binStr.charCodeAt(i);
-          }
-          gltfLoader.parse(bytes.buffer, '', resolve, reject);
-        } else {
-          gltfLoader.load(url, resolve, undefined, reject);
+    const loadTex = async (url, { isColor = true, flipY = true, mobileMaxDim = 1024 } = {}) => {
+      const webpUrl = url.replace(/\.png$/i, '.webp');
+      const embedded = consumeEmbedded('textures', webpUrl) || consumeEmbedded('textures', url);
+      const candidates = embedded ? [embedded] : (webpUrl !== url ? [webpUrl, url] : [url]);
+      for (const src of candidates) {
+        try {
+          return await loadTexSingle(src, { isColor, flipY, mobileMaxDim });
+        } catch {
+          // Try next candidate
         }
-      });
+      }
+      return null;
+    };
+
+    const loadGLB = async (url, fallbackUrl = null) => {
+      const b64 = consumeEmbedded('models', url) || (fallbackUrl ? consumeEmbedded('models', fallbackUrl) : null);
+      if (b64) {
+        const resp = await fetch(`data:model/gltf-binary;base64,${b64}`);
+        const buf = await resp.arrayBuffer();
+        return new Promise((resolve, reject) => gltfLoader.parse(buf, '', resolve, reject));
+      }
+      try {
+        return await new Promise((resolve, reject) => gltfLoader.load(url, resolve, undefined, reject));
+      } catch (err) {
+        if (fallbackUrl) {
+          return await new Promise((resolve, reject) => gltfLoader.load(fallbackUrl, resolve, undefined, reject));
+        }
+        throw err;
+      }
+    };
+
+    const runBatched = async (tasks, batchSize) => {
+      const results = [];
+      for (let i = 0; i < tasks.length; i += batchSize) {
+        const chunk = tasks.slice(i, i + batchSize).map((fn) => fn());
+        results.push(...(await Promise.all(chunk)));
+      }
+      return results;
+    };
 
     try {
-      updateProgress(16, '2K (2048x2048) 竜鱗石彫PBRマップ (Albedo / Normal / Roughness / AO / Emission) を展開中...');
+      updateProgress(16, '竜鱗石彫PBRマップ (Albedo / Normal / Roughness / AO / Emission) を展開中...');
+      const texSpecs = [
+        ['./assets/textures/white_piece_albedo.png', { isColor: true, flipY: false, mobileMaxDim: 1024 }],
+        ['./assets/textures/white_piece_normal.png', { isColor: false, flipY: false, mobileMaxDim: 1024 }],
+        ['./assets/textures/white_piece_roughness.png', { isColor: false, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/white_piece_metallic.png', { isColor: false, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/white_piece_ao.png', { isColor: false, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/white_piece_emission.png', { isColor: true, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/black_piece_albedo.png', { isColor: true, flipY: false, mobileMaxDim: 1024 }],
+        ['./assets/textures/black_piece_normal.png', { isColor: false, flipY: false, mobileMaxDim: 1024 }],
+        ['./assets/textures/black_piece_roughness.png', { isColor: false, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/black_piece_metallic.png', { isColor: false, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/black_piece_ao.png', { isColor: false, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/black_piece_emission.png', { isColor: true, flipY: false, mobileMaxDim: 512 }],
+        ['./assets/textures/board_tiles_albedo.png', { isColor: true, flipY: true, mobileMaxDim: 1024 }],
+        ['./assets/textures/board_tiles_normal.png', { isColor: false, flipY: true, mobileMaxDim: 1024 }],
+        ['./assets/textures/board_tiles_roughness.png', { isColor: false, flipY: true, mobileMaxDim: 512 }],
+        ['./assets/textures/board_tiles_metallic.png', { isColor: false, flipY: true, mobileMaxDim: 512 }],
+        ['./assets/textures/board_tiles_ao.png', { isColor: false, flipY: true, mobileMaxDim: 512 }]
+      ];
+      const texBatchSize = this.isMobileDevice ? 4 : texSpecs.length;
       const [
         wAlbedo, wNormal, wRough, wMetal, wAO, wEmissive,
         bAlbedo, bNormal, bRough, bMetal, bAO, bEmissive,
         tAlbedo, tNormal, tRough, tMetal, tAO
-      ] = await Promise.all([
-        loadTex('/assets/textures/white_piece_albedo.png', { isColor: true, flipY: false }),
-        loadTex('/assets/textures/white_piece_normal.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/white_piece_roughness.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/white_piece_metallic.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/white_piece_ao.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/white_piece_emission.png', { isColor: true, flipY: false }),
-        loadTex('/assets/textures/black_piece_albedo.png', { isColor: true, flipY: false }),
-        loadTex('/assets/textures/black_piece_normal.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/black_piece_roughness.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/black_piece_metallic.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/black_piece_ao.png', { isColor: false, flipY: false }),
-        loadTex('/assets/textures/black_piece_emission.png', { isColor: true, flipY: false }),
-        loadTex('/assets/textures/board_tiles_albedo.png', { isColor: true, flipY: true }),
-        loadTex('/assets/textures/board_tiles_normal.png', { isColor: false, flipY: true }),
-        loadTex('/assets/textures/board_tiles_roughness.png', { isColor: false, flipY: true }),
-        loadTex('/assets/textures/board_tiles_metallic.png', { isColor: false, flipY: true }),
-        loadTex('/assets/textures/board_tiles_ao.png', { isColor: false, flipY: true })
-      ]);
+      ] = await runBatched(texSpecs.map(([u, opts]) => () => loadTex(u, opts)), texBatchSize);
 
       // Construct 2K Carved Dragon-Stonework PBR Materials for White & Black Factions
       this.materials.w = new THREE.MeshStandardMaterial({
@@ -1122,16 +1213,37 @@ class WizardsChessApp {
 
       updateProgress(45, '3D ゴシック大聖堂と古代ルーン岩場祭壇を召喚中...');
       try {
-        const cathedralGLTF = await loadGLB('/assets/models/gothic_cathedral.glb');
+        const cathedralGLTF = await loadGLB('./assets/models/gothic_cathedral_webp.glb', './assets/models/gothic_cathedral.glb');
         cathedralGLTF.scene.rotation.y = Math.PI;
+        const downscaledTex = new Set();
         cathedralGLTF.scene.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
             if (child.material) {
-              const mName = child.material.name || '';
-              if (!mName.includes('Glass') && !mName.includes('Ember')) {
-                child.material.roughness = Math.max(child.material.roughness ?? 0.65, 0.68);
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              for (const mat of mats) {
+                const mName = mat.name || '';
+                if (!mName.includes('Glass') && !mName.includes('Ember')) {
+                  mat.roughness = Math.max(mat.roughness ?? 0.65, 0.68);
+                }
+                if (this.isMobileDevice) {
+                  for (const [slot, maxDim] of [
+                    ['map', 768],
+                    ['normalMap', 768],
+                    ['roughnessMap', 512],
+                    ['metalnessMap', 512],
+                    ['aoMap', 512],
+                    ['emissiveMap', 512]
+                  ]) {
+                    const tex = mat[slot];
+                    if (tex && !downscaledTex.has(tex)) {
+                      downscaledTex.add(tex);
+                      tex.anisotropy = Math.min(2, tex.anisotropy || 1);
+                      this._downscaleTextureForMobile(tex, maxDim);
+                    }
+                  }
+                }
               }
             }
           }
@@ -1147,16 +1259,16 @@ class WizardsChessApp {
 
       updateProgress(82, 'ドラゴンたちを呼び覚まし中...');
       const pieceMap = [
-        ['p', '/assets/models/pawn.glb'],
-        ['r', '/assets/models/rook.glb'],
-        ['n', '/assets/models/knight.glb'],
-        ['b', '/assets/models/bishop.glb'],
-        ['q', '/assets/models/queen.glb'],
-        ['k', '/assets/models/king.glb']
+        ['p', './assets/models/pawn.glb'],
+        ['r', './assets/models/rook.glb'],
+        ['n', './assets/models/knight.glb'],
+        ['b', './assets/models/bishop.glb'],
+        ['q', './assets/models/queen.glb'],
+        ['k', './assets/models/king.glb']
       ];
 
-      await Promise.all(
-        pieceMap.map(async ([code, url]) => {
+      await runBatched(
+        pieceMap.map(([code, url]) => async () => {
           const gltf = await loadGLB(url);
           gltf.scene.traverse((child) => {
             if ((child.isMesh || child.isSkinnedMesh) && child.geometry) {
@@ -1170,8 +1282,15 @@ class WizardsChessApp {
             scene: gltf.scene,
             animations: gltf.animations || []
           };
-        })
+        }),
+        this.isMobileDevice ? 2 : pieceMap.length
       );
+
+      // Release embedded texture & model Base64 caches once parsed into Three.js objects
+      if (window.__EMBEDDED_ASSETS__) {
+        delete window.__EMBEDDED_ASSETS__.textures;
+        delete window.__EMBEDDED_ASSETS__.models;
+      }
 
       updateProgress(96, '双覇王古竜の決戦局面へ召喚中 (土台なし・マス接地)...');
       this.syncBoardFromFEN();
@@ -1446,7 +1565,12 @@ class WizardsChessApp {
   _removePieceInstance(square) {
     const inst = this.pieceInstances.get(square);
     if (!inst) return;
+    inst.mixer?.stopAllAction?.();
     this.activeMixers.delete(inst.mixer);
+    if (inst.hpBarSprite) {
+      inst.hpBarSprite.material?.map?.dispose();
+      inst.hpBarSprite.material?.dispose();
+    }
     this.scene.remove(inst.root);
     this.pieceInstances.delete(square);
   }
@@ -2647,7 +2771,7 @@ class WizardsChessApp {
       this._adjustCameraForViewport();
       if (!isMobileView()) closeMobileDrawers();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
-      this.composer.setSize(window.innerWidth, window.innerHeight);
+      this.composer?.setSize(window.innerWidth, window.innerHeight);
     });
 
     const dom = this.renderer.domElement;
@@ -3095,7 +3219,11 @@ class WizardsChessApp {
 
     this._updateClocks(performance.now());
 
-    this.composer.render();
+    if (this.composer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }
 
