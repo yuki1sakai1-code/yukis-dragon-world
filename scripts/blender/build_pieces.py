@@ -1,5 +1,5 @@
 """
-Master Headless Blender Pipeline for Dragon-Stonework 3D Wizard's Chess Pieces.
+Master Headless Blender Pipeline for Draconic Sanctum 3D Dragon-Stonework Pieces.
 Orchestrates:
   1. piece_pbr        -> 2K (2048x2048) Dragon-Stonework PBR Maps (Albedo, Normal, Roughness, Metallic, AO, Emission)
   2. piece_meshes     -> 6 Sculpted Dragon-Stonework Statues (Pawn, Rook, Knight, Bishop, Queen, King)

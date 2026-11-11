@@ -1,5 +1,5 @@
 """
-3D Gothic Dragon-Sanctum Cathedral & Wizard's Chess Altar Builder (Headless Blender 5.2).
+3D Gothic Dragon-Sanctum Cathedral & Ritual Altar Builder (Headless Blender 5.2).
 Builds gothic_cathedral.glb and renders cathedral_preview.png using dragon_spec.py paths.
 """
 import os
@@ -1062,7 +1062,7 @@ def build_north_dragon_high_altar(objs, mats):
 
 
 # ==============================================================================
-# PART 3: HIGH GOTHIC GREAT HALL, GARGOYLE PIERS, TRIFORIUM, VAULTS & ROSE WINDOW
+# PART 3: HIGH GOTHIC CATHEDRAL HALL, GARGOYLE PIERS, TRIFORIUM, VAULTS & ROSE WINDOW
 # ==============================================================================
 def build_cathedral_hall(mats):
     print("Building High Gothic Dragon-Sanctum Hall, Gargoyle Piers, Triforium, Vaults, Pews & Chandeliers...")

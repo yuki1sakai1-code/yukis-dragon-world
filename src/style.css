@@ -625,7 +625,7 @@ html, body {
   padding: 6px 9px;
 }
 
-/* Spell Input & Quick Spells */
+/* Dragon Command Input & Quick Commands */
 .spell-form {
   display: flex;
   gap: 5px;

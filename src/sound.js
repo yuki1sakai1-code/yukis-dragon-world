@@ -1,4 +1,4 @@
-// Procedural Web Audio Synthesizer for Wizard's Chess (Stone Grinding, Sword Clash, Shatter & Choir)
+// Procedural Web Audio Synthesizer for Draconic Sanctum (Stone Grinding, Sword Clash, Shatter & Choir)
 
 export class SoundEffects {
   constructor() {
@@ -18,7 +18,7 @@ export class SoundEffects {
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
+      this.ctx.resume().catch(() => { });
     }
   }
 

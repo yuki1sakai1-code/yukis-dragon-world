@@ -3121,7 +3121,7 @@ class WizardsChessApp {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       const toast = document.getElementById('status-toast');
       if (!SpeechRec) {
-        if (toast) toast.textContent = '🎙️ お使いのブラウザは音声認識非対応です。テキスト欄に呪文を入力してください。';
+        if (toast) toast.textContent = '🎙️ お使いのブラウザは音声認識非対応です。テキスト欄に竜語号令を入力してください。';
         return;
       }
       const rec = new SpeechRec();
@@ -3138,7 +3138,7 @@ class WizardsChessApp {
         const ok = this.parseAndCastCommand(transcript);
         if (toast) {
           toast.textContent = ok
-            ? `🎙️ 音声詠唱発動: 「${transcript}」!`
+            ? `🎙️ 音声号令発動: 「${transcript}」!`
             : `🎙️ 「${transcript}」に対応する合法手が見つかりませんでした。`;
         }
       };

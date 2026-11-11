@@ -1,4 +1,4 @@
-// Wizard's Chess AI Engine for 7x7 Draconic Sanctum
+// Draconic Sanctum AI Engine (7x7 Carved Stone Dragon Chess)
 // (Minimax + Alpha-Beta Pruning + Positional Piece-Square Tables)
 
 const PIECE_VALUES = {
