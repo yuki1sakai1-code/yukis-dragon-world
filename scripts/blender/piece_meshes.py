@@ -155,6 +155,7 @@ class DragonSculptor:
         uv_zone: tuple[float, float] = UV_ZONE_SCALES,
         v_repeats: int = 1,
         part_id: int = PART_UPPER_BODY,
+        part_ids: list[int] | None = None,
         smooth: bool = True,
     ) -> list[tuple[Vector, Vector, Vector]]:
         """
@@ -201,6 +202,7 @@ class DragonSculptor:
             if i >= end_ring_count:
                 continue
 
+            pid_i = part_ids[i] if part_ids is not None else part_id
             ring_mod = 1.0 + ring_ridge_amp * (1.0 if (i % 2 == 0) else -1.0)
             rx_e = max(rx * ring_mod, 0.0018)
             ry_e = max(ry * ring_mod, 0.0018)
@@ -218,7 +220,7 @@ class DragonSculptor:
                 if ventral_flat > 0.0 and sa < -0.18:
                     ly *= (1.0 - ventral_flat * min(1.0, abs(sa + 0.18)))
                 co = pt + x_cur * lx + n_cur * ly
-                ring.append((self._new_vert(co, part_id), vc))
+                ring.append((self._new_vert(co, pid_i), vc))
             rings.append(ring)
 
         avg_r = sum(0.5 * (st[1] + st[2]) for st in stations) / float(len(stations))
@@ -238,7 +240,7 @@ class DragonSculptor:
 
         v_mid = 0.5 * (v_lo + v_hi)
         # Start cap (-T outward) — planar 2D UV patch (no concentric bullseye rings)
-        c_start = self._new_vert(stations[0][0], part_id)
+        c_start = self._new_vert(stations[0][0], part_ids[0] if part_ids is not None else part_id)
         for s in range(segs):
             sn = (s + 1) % segs
             ang0 = (s / float(segs)) * 2.0 * math.pi
@@ -254,7 +256,7 @@ class DragonSculptor:
             )
 
         # End cap or sharp cone apex (+T outward)
-        c_end = self._new_vert(stations[-1][0], part_id)
+        c_end = self._new_vert(stations[-1][0], part_ids[-1] if part_ids is not None else part_id)
         r_last = rings[-1]
         for s in range(segs):
             sn = (s + 1) % segs
@@ -1015,6 +1017,8 @@ class DragonSculptor:
         underbite_tusks: bool = False,
         frill_count: int = 2,
         bronze_horn_rings: bool = False,
+        eye_outset: float = 0.0,
+        eye_scale: float = 1.0,
         part_id: int = PART_HEAD_JAW,
     ):
         """
@@ -1179,7 +1183,12 @@ class DragonSculptor:
         # 4. Fierce Supraorbital Brow Ridges, Glowing Slit Eyes, Frill Spikes & Main Horns
         for sgn in (-1.0, 1.0):
             # Armored supraorbital brow ridge
-            brow_p = neck_pos + y_fw * (0.115 * s * sn) + x_rt * (sgn * 0.072 * s) + z_up * (0.058 * s)
+            brow_p = (
+                neck_pos
+                + y_fw * (0.115 * s * sn)
+                + x_rt * (sgn * (0.072 + eye_outset * 0.45) * s)
+                + z_up * ((0.058 + eye_outset * 0.25) * s)
+            )
             self.add_3d_scale_plate(
                 pos=brow_p,
                 outward_dir=_safe_norm(x_rt * (sgn * 0.65) + z_up * 0.72),
@@ -1191,17 +1200,36 @@ class DragonSculptor:
             )
 
             # Glowing Runic Slit Dragon Eye tucked beneath brow armor
-            eye_pos = neck_pos + y_fw * (0.115 * s * sn) + x_rt * (sgn * 0.076 * s) + z_up * (0.036 * s)
-            self.add_lofted_spine(
-                [
-                    (eye_pos - y_fw * (0.026 * s), 0.015 * s, 0.011 * s),
-                    (eye_pos + y_fw * (0.028 * s), 0.013 * s, 0.009 * s),
-                ],
-                segs=6,
-                up_hint=z_up,
-                uv_zone=UV_ZONE_RUNES,
-                part_id=part_id,
+            eye_pos = (
+                neck_pos
+                + y_fw * ((0.115 + (0.006 if eye_outset > 0.0 else 0.0)) * s * sn)
+                + x_rt * (sgn * (0.076 + eye_outset) * s)
+                + z_up * (0.035 * s)
             )
+            es = eye_scale
+            if es > 1.05 or eye_outset > 0.0:
+                self.add_lofted_spine(
+                    [
+                        (eye_pos - y_fw * (0.031 * s * 1.15), 0.006 * s * es, 0.0045 * s * es),
+                        (eye_pos + x_rt * (sgn * 0.004 * s), 0.017 * s * es, 0.0098 * s * es),
+                        (eye_pos + y_fw * (0.034 * s * 1.15), 0.0055 * s * es, 0.0038 * s * es),
+                    ],
+                    segs=10,
+                    up_hint=z_up,
+                    uv_zone=UV_ZONE_RUNES,
+                    part_id=part_id,
+                )
+            else:
+                self.add_lofted_spine(
+                    [
+                        (eye_pos - y_fw * (0.026 * s), 0.015 * s, 0.011 * s),
+                        (eye_pos + y_fw * (0.028 * s), 0.013 * s, 0.009 * s),
+                    ],
+                    segs=6,
+                    up_hint=z_up,
+                    uv_zone=UV_ZONE_RUNES,
+                    part_id=part_id,
+                )
 
             # Squamosal / jugal cheek-frill horns
             for f_i in range(frill_count):
@@ -1563,7 +1591,7 @@ class DragonSculptor:
             up_hint=Vector((0.0, 0.0, 1.0)),
             dorsal_keel=0.35,
             ventral_flat=0.22,
-            sharp_tip=(tip_style == "barbed"),
+            sharp_tip=(tip_style in ("barbed", "pointed")),
             uv_zone=UV_ZONE_SCALES,
             v_repeats=3,
             part_id=part_id,
@@ -2116,7 +2144,7 @@ def _sculpt_bishop(sc: DragonSculptor):
     """
     sc.add_jagged_stone_crag(seed=51, max_r=0.45, crag_h=0.215, spire_bias_y=0.0, slab_tilt=(0.12, 0.12, 0.30))
 
-    # PART_LOWER_BODY: Heavy muscular coiled serpent-wyrm lower body + clawed drake hind-talons gripping crag
+    # PART_LOWER_BODY: Heavy muscular legless coiled serpent-wyrm lower body resting cleanly on crag / board
     coil_pts = []
     n_coil = 14
     for i in range(n_coil):
@@ -2133,19 +2161,6 @@ def _sculpt_bishop(sc: DragonSculptor):
     sc.add_spine_osteoderms(
         c_frames[2:], [(p[1], p[2]) for p in coil_pts[2:]], count=5, width=0.11, length=0.11, thickness=0.020, part_id=PART_LOWER_BODY
     )
-
-    for sgn in (-1.0, 1.0):
-        sc.add_dragon_hindleg(
-            hip_pos=Vector((sgn * 0.145, -0.02, 0.48)),
-            knee_pos=Vector((sgn * 0.225, 0.10, 0.37)),
-            ankle_pos=Vector((sgn * 0.235, -0.06, 0.28)),
-            foot_pos=Vector((sgn * 0.215, 0.06, 0.185)),
-            side=sgn,
-            thigh_r=0.068,
-            shin_r=0.046,
-            talon_len=0.082,
-            part_id=PART_LOWER_BODY,
-        )
 
     # PART_UPPER_BODY: Broad scaly hydra-wyrm chest bifurcating into twin shoulder-collars
     chest_pts = [
@@ -2279,27 +2294,28 @@ def _sculpt_bishop(sc: DragonSculptor):
 def _sculpt_queen(sc: DragonSculptor):
     """
     5. QUEEN (1.94m) — 四翼の飛翔女帝竜 (Four-Winged Celestial Elder Dragon):
-       Graceful, lethal Four-Winged Elder Dragon poised mid-ascension atop a jagged
-       runic rock spire! Long swan-like serpentine neck, 4-horned Crowned Elder Dragon
-       Skull with jaw-frills, poised raptorial forelimbs, FOUR sweeping carved-stone
-       dragon wings (soaring primary + lower secondary seraph wings), and ribbon-lance tail!
+       Graceful, lethal Four-Winged Elder Dragon tilted forward in a poised
+       quadrupedal stance with both clawed forelimbs grounded alongside her
+       hindfeet! Long swan-like serpentine neck, 4-horned Crowned Elder Dragon
+       Skull with jaw-frills, FOUR sweeping carved-stone dragon wings (soaring
+       primary + lower secondary seraph wings), and ribbon-lance tail!
     """
     sc.add_jagged_stone_crag(seed=64, max_r=0.45, crag_h=0.22, spire_bias_y=-0.02, slab_tilt=(0.16, -0.11, 0.25))
 
-    # PART_LOWER_BODY: Lithe, poised digitigrade hindlimbs & arched pelvis ascending off spire
+    # PART_LOWER_BODY: Digitigrade hindlimbs & lowered pelvis angled smoothly forward
     pelvis_pts = [
-        (Vector((0.0, -0.12, 0.68)), 0.102, 0.102),
-        (Vector((0.0, -0.05, 0.78)), 0.122, 0.118),
-        (Vector((0.0, 0.00, 0.88)), 0.126, 0.122),
+        (Vector((0.0, -0.20, 0.60)), 0.105, 0.102),
+        (Vector((0.0, -0.11, 0.67)), 0.124, 0.118),
+        (Vector((0.0, -0.02, 0.73)), 0.128, 0.122),
     ]
     sc.add_lofted_spine(pelvis_pts, segs=12, dorsal_keel=0.30, uv_zone=UV_ZONE_SCALES, part_id=PART_LOWER_BODY)
 
     for sgn in (-1.0, 1.0):
         sc.add_dragon_hindleg(
-            hip_pos=Vector((sgn * 0.11, -0.07, 0.76)),
-            knee_pos=Vector((sgn * 0.175, 0.08, 0.58)),
-            ankle_pos=Vector((sgn * 0.185, -0.12, 0.39)),
-            foot_pos=Vector((sgn * 0.155, 0.02, 0.198)),
+            hip_pos=Vector((sgn * 0.115, -0.13, 0.67)),
+            knee_pos=Vector((sgn * 0.180, 0.02, 0.52)),
+            ankle_pos=Vector((sgn * 0.190, -0.18, 0.36)),
+            foot_pos=Vector((sgn * 0.165, -0.07, 0.198)),
             side=sgn,
             thigh_r=0.078,
             shin_r=0.050,
@@ -2307,14 +2323,14 @@ def _sculpt_queen(sc: DragonSculptor):
             part_id=PART_LOWER_BODY,
         )
 
-    # PART_UPPER_BODY: Sleek arched dragon ribcage & long swan-like S-curved serpentine neck
+    # PART_UPPER_BODY: Forward-tilted sleek dragon ribcage & long swan-like S-curved serpentine neck
     spine_pts = [
-        (Vector((0.0, 0.00, 0.88)), 0.125, 0.122),
-        (Vector((0.0, 0.07, 1.02)), 0.142, 0.138),
-        (Vector((0.0, 0.08, 1.16)), 0.128, 0.125),
-        (Vector((0.0, 0.03, 1.29)), 0.094, 0.096),
-        (Vector((0.0, 0.06, 1.41)), 0.080, 0.084),
-        (Vector((0.0, 0.15, 1.50)), 0.072, 0.076),
+        (Vector((0.0, -0.02, 0.73)), 0.126, 0.122),
+        (Vector((0.0, 0.09, 0.82)), 0.142, 0.136),
+        (Vector((0.0, 0.19, 0.92)), 0.132, 0.126),
+        (Vector((0.0, 0.17, 1.07)), 0.094, 0.096),
+        (Vector((0.0, 0.14, 1.23)), 0.080, 0.084),
+        (Vector((0.0, 0.22, 1.37)), 0.072, 0.076),
     ]
     s_frames = sc.add_lofted_spine(
         spine_pts, segs=12, dorsal_keel=0.36, uv_zone=UV_ZONE_SCALES, v_repeats=3, part_id=PART_UPPER_BODY
@@ -2326,41 +2342,27 @@ def _sculpt_queen(sc: DragonSculptor):
         s_frames[:-1], count=7, len_start=0.105, len_end=0.068, r_base=0.022, sweep_back=0.50, radial_offset=0.080, part_id=PART_UPPER_BODY
     )
 
-    # PART_WEAPON_R & PART_SHIELD_L: Aristocratic slashing elder-dragon forelimbs with 4 long curved talons
-    sc.add_dragon_forelimb(
-        shoulder_pos=Vector((0.135, 0.07, 1.16)),
-        elbow_pos=Vector((0.225, -0.01, 1.05)),
-        wrist_pos=Vector((0.195, 0.22, 1.08)),
-        claw_forward=Vector((-0.20, 0.92, -0.32)),
-        claw_up=Vector((0.22, 0.32, 0.92)),
-        side=1.0,
-        upper_r=0.056,
-        fore_r=0.044,
-        talon_len=0.105,
-        num_talons=4,
-        curl_deg=54.0,
-        pauldron_spike_len=0.095,
-        part_id=PART_WEAPON_R,
-    )
-    sc.add_dragon_forelimb(
-        shoulder_pos=Vector((-0.135, 0.07, 1.14)),
-        elbow_pos=Vector((-0.225, -0.01, 1.02)),
-        wrist_pos=Vector((-0.195, 0.20, 1.01)),
-        claw_forward=Vector((0.20, 0.92, -0.34)),
-        claw_up=Vector((-0.22, 0.34, 0.92)),
-        side=-1.0,
-        upper_r=0.056,
-        fore_r=0.044,
-        talon_len=0.105,
-        num_talons=4,
-        curl_deg=54.0,
-        pauldron_spike_len=0.095,
-        part_id=PART_SHIELD_L,
-    )
+    # PART_WEAPON_R & PART_SHIELD_L: Grounded elder-dragon forelimbs bracing both clawed hands firmly on ground
+    for sgn, pid in ((1.0, PART_WEAPON_R), (-1.0, PART_SHIELD_L)):
+        sc.add_dragon_forelimb(
+            shoulder_pos=Vector((sgn * 0.135, 0.17, 0.90)),
+            elbow_pos=Vector((sgn * 0.235, 0.09, 0.58)),
+            wrist_pos=Vector((sgn * 0.205, 0.29, 0.195)),
+            claw_forward=Vector((-sgn * 0.10, 0.95, -0.20)),
+            claw_up=Vector((0.0, 0.20, 0.98)),
+            side=sgn,
+            upper_r=0.056,
+            fore_r=0.044,
+            talon_len=0.096,
+            num_talons=4,
+            curl_deg=50.0,
+            pauldron_spike_len=0.095,
+            part_id=pid,
+        )
 
     # PART_HEAD_JAW: Regal 4-Horned Crowned Elder Dragon Skull with 3-spined jaw-frills!
     sc.add_anatomical_dragon_skull(
-        neck_pos=Vector((0.0, 0.16, 1.50)),
+        neck_pos=Vector((0.0, 0.23, 1.37)),
         forward_dir=Vector((0.0, 0.95, -0.28)),
         up_dir=Vector((0.0, 0.28, 0.95)),
         scale=0.96,
@@ -2375,16 +2377,16 @@ def _sculpt_queen(sc: DragonSculptor):
         part_id=PART_HEAD_JAW,
     )
 
-    # PART_WINGS_TAIL: FOUR Sweeping Carved-Stone Dragon Wings (Upper Primary + Lower Secondary Seraph Wings!)
+    # PART_WINGS_TAIL: FOUR Sweeping Carved-Stone Dragon Wings (Upper Primary soaring to 1.94m + Lower Secondary Seraph Wings!)
     for sgn in (-1.0, 1.0):
         # 1. Grand Upper Primary Wings soaring to Z = 1.94m
         sc.add_dragon_wing(
-            shoulder_pos=Vector((sgn * 0.115, 0.01, 1.20)),
+            shoulder_pos=Vector((sgn * 0.115, 0.11, 0.98)),
             side=sgn,
-            wrist_pos=Vector((sgn * 0.39, -0.08, 1.84)),
-            outer_tip=Vector((sgn * 0.52, -0.18, 1.94)),
-            inner_tip=Vector((sgn * 0.24, -0.24, 1.12)),
-            flank_anchor=Vector((sgn * 0.11, -0.06, 1.04)),
+            wrist_pos=Vector((sgn * 0.39, -0.02, 1.82)),
+            outer_tip=Vector((sgn * 0.52, -0.16, 1.94)),
+            inner_tip=Vector((sgn * 0.24, -0.20, 1.06)),
+            flank_anchor=Vector((sgn * 0.11, 0.03, 0.84)),
             num_fingers=4,
             spar_r=0.036,
             scallop_depth=0.090,
@@ -2393,12 +2395,12 @@ def _sculpt_queen(sc: DragonSculptor):
         )
         # 2. Lower Secondary Seraph-Drake Wings splaying wide below primary wings!
         sc.add_dragon_wing(
-            shoulder_pos=Vector((sgn * 0.105, -0.05, 0.96)),
+            shoulder_pos=Vector((sgn * 0.105, 0.04, 0.82)),
             side=sgn,
-            wrist_pos=Vector((sgn * 0.36, -0.14, 1.14)),
-            outer_tip=Vector((sgn * 0.50, -0.24, 0.98)),
-            inner_tip=Vector((sgn * 0.20, -0.26, 0.56)),
-            flank_anchor=Vector((sgn * 0.10, -0.10, 0.72)),
+            wrist_pos=Vector((sgn * 0.36, -0.08, 1.08)),
+            outer_tip=Vector((sgn * 0.50, -0.22, 0.92)),
+            inner_tip=Vector((sgn * 0.20, -0.22, 0.52)),
+            flank_anchor=Vector((sgn * 0.10, -0.04, 0.66)),
             num_fingers=3,
             spar_r=0.028,
             scallop_depth=0.068,
@@ -2408,10 +2410,10 @@ def _sculpt_queen(sc: DragonSculptor):
 
     sc.add_anatomical_dragon_tail(
         ctrl_pts=(
-            Vector((0.0, -0.12, 0.70)),
-            Vector((-0.08, -0.46, 0.48)),
-            Vector((-0.36, -0.40, 0.26)),
-            Vector((-0.34, -0.06, 0.34)),
+            Vector((0.0, -0.20, 0.60)),
+            Vector((-0.08, -0.46, 0.42)),
+            Vector((-0.36, -0.40, 0.25)),
+            Vector((-0.34, -0.06, 0.33)),
         ),
         r_base=0.078,
         r_tip=0.018,
@@ -2424,157 +2426,166 @@ def _sculpt_queen(sc: DragonSculptor):
 
 def _sculpt_king(sc: DragonSculptor):
     """
-    6. KING (2.18m) — 大聖堂の覇王古竜 (Colossal Rearing Quadruped Sovereign Arch-Dragon):
-       Monumental Rearing Western Arch-Dragon commanding the sanctuary! Massive clawed
-       hindlegs, osteoderm-armored barrel chest with glowing fire-furnace throat vent,
-       mighty raised 4-taloned dragon forelimbs, Triple-Horned Sovereign Arch-Dragon
-       Skull, colossal Cathedral-Arch Bat-Wings towering to 2.18m, and spiked mace-tail!
+    6. KING (2.42m) — 大聖堂の覇王古竜 (Great Dragon Bipedal Sovereign Arch-Dragon):
+       Iconic heavy pear-shaped bipedal Great Dragon build: massive muscular thighs &
+       planted Z-bent hindlegs, rounded broad lower belly tapering smoothly into a graceful
+       S-curved dorsal-spiked neck, compact forelimbs poised in front of the chest, swept-back
+       mohawk crest-fin + twin Great Dragon horns over fierce brows, soaring cathedral bat-wings
+       with tall wing-thumbs, and a thick ground-sweeping serrated tail!
     """
     sc.add_jagged_stone_crag(seed=79, max_r=0.465, crag_h=0.22, spire_bias_y=-0.02, slab_tilt=(0.14, 0.08, -0.22))
 
-    # PART_LOWER_BODY: Colossal muscular arch-dragon haunches & heavy 4-taloned hindlegs
-    pelvis_pts = [
-        (Vector((0.0, -0.15, 0.68)), 0.138, 0.135),
-        (Vector((0.0, -0.07, 0.80)), 0.168, 0.162),
-        (Vector((0.0, 0.00, 0.92)), 0.175, 0.168),
+    # Unified seamless torso (pelvis -> pear belly -> chest -> S-curved neck) so waist bends with zero cap/seam gap!
+    # 11 stations (10 rings) with v_repeats=5 -> cos(i*pi/2) gives uniform |dv|=0.5 on every ring.
+    torso_pts = [
+        (Vector((0.0, -0.06, 0.36)), 0.150, 0.160),
+        (Vector((0.0,  0.01, 0.52)), 0.210, 0.222),
+        (Vector((0.0,  0.05, 0.69)), 0.226, 0.232),
+        (Vector((0.0,  0.06, 0.85)), 0.214, 0.218),
+        (Vector((0.0,  0.06, 1.01)), 0.194, 0.196),
+        (Vector((0.0,  0.07, 1.17)), 0.178, 0.180),
+        (Vector((0.0,  0.05, 1.33)), 0.158, 0.160),
+        (Vector((0.0,  0.00, 1.49)), 0.125, 0.128),
+        (Vector((0.0, -0.02, 1.63)), 0.105, 0.110),
+        (Vector((0.0,  0.05, 1.77)), 0.098, 0.104),
+        (Vector((0.0,  0.18, 1.89)), 0.094, 0.100),
     ]
-    p_frames = sc.add_lofted_spine(pelvis_pts, segs=14, dorsal_keel=0.32, uv_zone=UV_ZONE_SCALES, part_id=PART_LOWER_BODY)
-    sc.add_spine_osteoderms(p_frames, [(p[1], p[2]) for p in pelvis_pts], count=3, width=0.14, length=0.14, thickness=0.025, part_id=PART_LOWER_BODY)
+    torso_pids = [PART_LOWER_BODY] * 4 + [PART_UPPER_BODY] * 7
+    t_frames = sc.add_lofted_spine(
+        torso_pts,
+        segs=14,
+        dorsal_keel=0.28,
+        uv_zone=UV_ZONE_SCALES,
+        v_repeats=5,
+        part_id=PART_UPPER_BODY,
+        part_ids=torso_pids,
+    )
+    sc.add_dorsal_spines(
+        t_frames[:4], count=4, len_start=0.075, len_end=0.085, r_base=0.024, sweep_back=0.52, radial_offset=0.14, part_id=PART_LOWER_BODY
+    )
+    sc.add_dorsal_spines(
+        t_frames[4:], count=11, len_start=0.088, len_end=0.068, r_base=0.024, sweep_back=0.58, radial_offset=0.075, part_id=PART_UPPER_BODY
+    )
 
     for sgn in (-1.0, 1.0):
         sc.add_dragon_hindleg(
-            hip_pos=Vector((sgn * 0.155, -0.09, 0.80)),
-            knee_pos=Vector((sgn * 0.235, 0.08, 0.58)),
-            ankle_pos=Vector((sgn * 0.245, -0.14, 0.39)),
-            foot_pos=Vector((sgn * 0.215, 0.02, 0.195)),
+            hip_pos=Vector((sgn * 0.175, -0.04, 0.68)),
+            knee_pos=Vector((sgn * 0.275, 0.21, 0.50)),
+            ankle_pos=Vector((sgn * 0.255, -0.06, 0.31)),
+            foot_pos=Vector((sgn * 0.245, 0.17, 0.195)),
             side=sgn,
-            thigh_r=0.098,
-            shin_r=0.064,
-            talon_len=0.105,
+            thigh_r=0.142,
+            shin_r=0.084,
+            talon_len=0.125,
+            foot_forward=Vector((sgn * 0.12, 1.0, -0.14)),
             part_id=PART_LOWER_BODY,
         )
 
-    # PART_UPPER_BODY: Towering osteoderm-armored barrel chest & muscular arch-dragon neck
-    spine_pts = [
-        (Vector((0.0, 0.00, 0.92)), 0.175, 0.168),
-        (Vector((0.0, 0.08, 1.08)), 0.202, 0.192),
-        (Vector((0.0, 0.10, 1.25)), 0.188, 0.180),
-        (Vector((0.0, 0.07, 1.40)), 0.142, 0.142),
-        (Vector((0.0, 0.10, 1.53)), 0.115, 0.118),
-        (Vector((0.0, 0.17, 1.63)), 0.102, 0.106),
-    ]
-    s_frames = sc.add_lofted_spine(
-        spine_pts, segs=14, dorsal_keel=0.38, uv_zone=UV_ZONE_SCALES, v_repeats=3, part_id=PART_UPPER_BODY
-    )
-    # Dorsal & sternal pectoral osteoderm armor rows
-    for lat_deg in (-36.0, 0.0, 36.0):
-        sc.add_spine_osteoderms(
-            s_frames[:-1],
-            [(p[1], p[2]) for p in spine_pts[:-1]],
-            count=5,
-            width=0.135,
-            length=0.14,
-            thickness=0.026,
-            lateral_angle_deg=lat_deg,
-            part_id=PART_UPPER_BODY,
-        )
-    sc.add_dorsal_spines(
-        s_frames[:-1], count=7, len_start=0.135, len_end=0.088, r_base=0.030, sweep_back=0.45, radial_offset=0.12, part_id=PART_UPPER_BODY
-    )
-
-    # Glowing Draconic Fire-Furnace Sternal Fissure along the Arch-Dragon's chest!
-    sc.add_lofted_spine(
-        [
-            (Vector((0.0, 0.25, 1.06)), 0.032, 0.022),
-            (Vector((0.0, 0.26, 1.24)), 0.038, 0.026),
-            (Vector((0.0, 0.20, 1.40)), 0.026, 0.018),
-        ],
-        segs=8,
-        up_hint=Vector((0.0, 1.0, 0.0)),
-        uv_zone=UV_ZONE_RUNES,
-        part_id=PART_UPPER_BODY,
-    )
-
-    # PART_WEAPON_R (+X): Mighty raised Right Arch-Dragon Forelimb (`mean_x > 0.22` for clean limb rig!)
+    # PART_WEAPON_R (+X): Compact muscular right dragon forelimb curled in front of chest
     sc.add_dragon_forelimb(
-        shoulder_pos=Vector((0.185, 0.09, 1.32)),
-        elbow_pos=Vector((0.295, 0.02, 1.22)),
-        wrist_pos=Vector((0.265, 0.26, 1.38)),
-        claw_forward=Vector((-0.24, 0.90, -0.34)),
-        claw_up=Vector((0.25, 0.34, 0.90)),
+        shoulder_pos=Vector((0.148, 0.07, 1.36)),
+        elbow_pos=Vector((0.215, 0.04, 1.15)),
+        wrist_pos=Vector((0.175, 0.24, 1.24)),
+        claw_forward=Vector((-0.26, 0.88, -0.38)),
+        claw_up=Vector((0.20, 0.36, 0.91)),
         side=1.0,
-        upper_r=0.078,
-        fore_r=0.062,
-        talon_len=0.120,
+        upper_r=0.060,
+        fore_r=0.048,
+        talon_len=0.088,
         num_talons=4,
-        curl_deg=56.0,
-        pauldron_spike_len=0.135,
+        curl_deg=58.0,
+        pauldron_spike_len=0.0,
         part_id=PART_WEAPON_R,
     )
 
-    # PART_SHIELD_L (-X): Mighty poised Left Arch-Dragon Forelimb
+    # PART_SHIELD_L (-X): Compact muscular left dragon forelimb poised forward of chest
     sc.add_dragon_forelimb(
-        shoulder_pos=Vector((-0.185, 0.09, 1.30)),
-        elbow_pos=Vector((-0.295, 0.01, 1.18)),
-        wrist_pos=Vector((-0.255, 0.25, 1.24)),
-        claw_forward=Vector((0.22, 0.92, -0.32)),
-        claw_up=Vector((-0.24, 0.32, 0.92)),
+        shoulder_pos=Vector((-0.148, 0.07, 1.35)),
+        elbow_pos=Vector((-0.215, 0.03, 1.14)),
+        wrist_pos=Vector((-0.172, 0.25, 1.21)),
+        claw_forward=Vector((0.24, 0.90, -0.36)),
+        claw_up=Vector((-0.20, 0.34, 0.92)),
         side=-1.0,
-        upper_r=0.078,
-        fore_r=0.062,
-        talon_len=0.120,
+        upper_r=0.060,
+        fore_r=0.048,
+        talon_len=0.088,
         num_talons=4,
-        curl_deg=56.0,
-        pauldron_spike_len=0.135,
+        curl_deg=58.0,
+        pauldron_spike_len=0.0,
         part_id=PART_SHIELD_L,
     )
 
-    # PART_HEAD_JAW: Triple-Horned Sovereign Arch-Dragon Skull (Twin Giant Horns + Central Crown-Horn Crest!)
+    # PART_HEAD_JAW: Swept-crest Great Dragon skull with fierce brow, twin backward horns & snarling jaw
+    head_neck = Vector((0.0, 0.20, 1.89))
+    head_fw = Vector((0.0, 0.94, -0.34)).normalized()
+    head_up = Vector((0.0, 0.34, 0.94)).normalized()
     sc.add_anatomical_dragon_skull(
-        neck_pos=Vector((0.0, 0.18, 1.64)),
-        forward_dir=Vector((0.0, 0.95, -0.30)),
-        up_dir=Vector((0.0, 0.30, 0.95)),
-        scale=1.16,
-        snout_stretch=1.04,
-        jaw_open_deg=32.0,
-        horn_len=0.38,
-        horn_spread_deg=25.0,
-        horn_curve_rad=0.68,
-        crown_horns=2,
-        central_crest_horn=0.31,
-        frill_count=3,
-        bronze_horn_rings=True,
+        neck_pos=head_neck,
+        forward_dir=head_fw,
+        up_dir=head_up,
+        scale=1.12,
+        snout_stretch=1.10,
+        jaw_open_deg=14.0,
+        horn_len=0.35,
+        horn_spread_deg=20.0,
+        horn_curve_rad=0.38,
+        horn_forward_sweep=-0.72,
+        crown_horns=0,
+        central_crest_horn=0.27,
+        frill_count=1,
+        bronze_horn_rings=False,
+        eye_outset=0.022,
+        eye_scale=1.55,
         part_id=PART_HEAD_JAW,
     )
+    # Iconic Great Dragon swept mohawk-fin crest spines trailing behind the central horn crest
+    for ci, (back_t, up_t, c_len, c_r) in enumerate((
+        (0.015, 0.078, 0.22, 0.028),
+        (-0.035, 0.066, 0.185, 0.024),
+        (-0.082, 0.048, 0.150, 0.020),
+    )):
+        sc.add_curved_horn(
+            base_pos=head_neck + head_fw * back_t + head_up * up_t,
+            base_dir=(-head_fw * 0.56 + head_up * 0.83).normalized(),
+            curve_dir=-head_fw,
+            length=c_len,
+            r_base=c_r,
+            curve_rad=0.40,
+            rings=5,
+            segs=6,
+            ridge_amp=0.04,
+            uv_zone=UV_ZONE_STONE,
+            part_id=PART_HEAD_JAW,
+        )
 
-    # PART_WINGS_TAIL: Colossal 5-Fingered Cathedral-Arch Bat-Wings towering to 2.18m + Spiked Mace-Tail!
+    # PART_WINGS_TAIL: Soaring High-Mounted 4-Finger Bat-Wings + Thick Ground-Sweeping Spiked Tail
     for sgn in (-1.0, 1.0):
         sc.add_dragon_wing(
-            shoulder_pos=Vector((sgn * 0.155, -0.02, 1.36)),
+            shoulder_pos=Vector((sgn * 0.115, -0.05, 1.42)),
             side=sgn,
-            wrist_pos=Vector((sgn * 0.41, -0.10, 2.06)),
-            outer_tip=Vector((sgn * 0.53, -0.20, 2.18)),
-            inner_tip=Vector((sgn * 0.24, -0.28, 0.88)),
-            flank_anchor=Vector((sgn * 0.14, -0.10, 0.92)),
-            num_fingers=5,
+            wrist_pos=Vector((sgn * 0.46, -0.14, 2.26)),
+            outer_tip=Vector((sgn * 0.58, -0.18, 2.40)),
+            inner_tip=Vector((sgn * 0.48, -0.26, 0.72)),
+            flank_anchor=Vector((sgn * 0.15, -0.08, 0.92)),
+            num_fingers=4,
             spar_r=0.044,
-            scallop_depth=0.096,
-            sub_w=3,
+            scallop_depth=0.125,
+            sub_w=4,
             part_id=PART_WINGS_TAIL,
         )
 
     sc.add_anatomical_dragon_tail(
         ctrl_pts=(
-            Vector((0.0, -0.15, 0.72)),
-            Vector((0.10, -0.48, 0.48)),
-            Vector((0.38, -0.42, 0.28)),
-            Vector((0.40, -0.08, 0.38)),
+            Vector((0.0, -0.14, 0.48)),
+            Vector((-0.24, -0.44, 0.31)),
+            Vector((0.36, -0.44, 0.30)),
+            Vector((0.48, -0.02, 0.56)),
         ),
-        r_base=0.098,
-        r_tip=0.028,
-        n_stations=14,
-        spine_count=8,
-        tip_style="mace",
+        r_base=0.145,
+        r_tip=0.018,
+        n_stations=16,
+        spine_count=14,
+        tip_style="pointed",
         part_id=PART_WINGS_TAIL,
     )
 
@@ -2625,7 +2636,7 @@ def build_piece_mesh_data(piece_name: str) -> tuple[bpy.types.Mesh, list[int]]:
     crag_top = 0.220
     z_max = max(v.co.z for v in bm.verts)
     max_crag_r = min(0.472, float(MAX_CRAG_RADIUS) - 0.008)
-    max_body_r = min(0.555, float(MAX_WING_RADIUS) - 0.005)
+    max_body_r = 0.78 if key == "king" else min(0.555, float(MAX_WING_RADIUS) - 0.005)
 
     if z_max > crag_top + 1e-4:
         upper_scale = (target_h - crag_top) / (z_max - crag_top)

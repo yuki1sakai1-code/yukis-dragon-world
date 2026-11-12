@@ -27,7 +27,7 @@ PIECE_SPECS = [
     ("knight", 1.62),  # Rearing Winged Wyvern (Bipedal Sky-Predator with swept wings & raptorial talons)
     ("bishop", 1.72),  # Twin-Headed Oracle Hydra-Wyrm (Coiled Serpentine Dragon with TWO horned dragon necks/heads!)
     ("queen",  1.94),  # Four-Winged Celestial Elder Dragon (Soaring Quad-Winged Crowned Elder Wyrm)
-    ("king",   2.18),  # Sovereign Arch-Dragon (Colossal Rearing Quadrupedal Western Arch-Dragon)
+    ("king",   2.42),  # Sovereign Arch-Dragon (Colossal Rearing Quadrupedal Western Arch-Dragon)
 ]
 
 PIECE_HEIGHTS = dict(PIECE_SPECS)

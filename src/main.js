@@ -27,7 +27,7 @@ export const DRAGON_STATS = {
   b: { maxHp: 40, atk: 45, def: 15, headHeight: 1.65, title: '双頭の秘術竜ヒドラ' },
   r: { maxHp: 80, atk: 55, def: 35, headHeight: 1.35, title: '要塞重装鎧地竜' },
   q: { maxHp: 90, atk: 70, def: 25, headHeight: 1.85, title: '四翼の飛翔女帝竜' },
-  k: { maxHp: 100, atk: 50, def: 40, headHeight: 2.10, title: '聖堂の覇王古竜' }
+  k: { maxHp: 100, atk: 50, def: 40, headHeight: 2.28, title: '聖堂の覇王古竜' }
 };
 
 function createHpBarSprite(maxHp, currentHp) {
@@ -1119,12 +1119,30 @@ class WizardsChessApp {
         'vec3(0.088, 0.072, 0.078)' // Royal crimson-tinted dark velvet pearl
       );
 
-      // Helper to add underbelly pale-white shading to King dragons (15% tighter mask)
-      const applyKingBellyShader = (mat, bellyWhiteVec) => {
+      // Helper to add underbelly pale-white shading + piercing jewel dragon eyes to King dragons
+      const applyKingBellyShader = (mat, bellyWhiteVec, eyeCfg = null) => {
+        const eyeOuterDiff = eyeCfg?.outerDiff || 'vec3(0.00, 0.08, 0.42)';
+        const eyeInnerDiff = eyeCfg?.innerDiff || 'vec3(0.02, 0.36, 0.90)';
+        const eyeOuterGlow = eyeCfg?.outerGlow || 'vec3(0.00, 0.14, 0.85)';
+        const eyeInnerGlow = eyeCfg?.innerGlow || 'vec3(0.04, 0.56, 1.35)';
+        const cacheTag = eyeCfg?.tag || 'default';
+
+        const eyeMaskGlsl = `
+            float eyeUvBand = smoothstep(0.095, 0.106, vEyeUv.y) * (1.0 - smoothstep(0.184, 0.195, vEyeUv.y));
+            float eyePosX = smoothstep(0.078, 0.085, abs(vBellyPos.x)) * (1.0 - smoothstep(0.144, 0.152, abs(vBellyPos.x)));
+            float eyePosY = smoothstep(1.860, 1.868, vBellyPos.y) * (1.0 - smoothstep(1.909, 1.918, vBellyPos.y));
+            float eyePosZ = smoothstep(-0.405, -0.396, vBellyPos.z) * (1.0 - smoothstep(-0.313, -0.304, vBellyPos.z));
+            float eyeMask = clamp(eyeUvBand * eyePosX * eyePosY * eyePosZ, 0.0, 1.0);
+        `;
+
+        // Unique cache key ensures White King (Sapphire) & Black King (Crimson) NEVER reuse the same compiled WebGL shader!
+        mat.customProgramCacheKey = () => `king_belly_eye_${cacheTag}_${bellyWhiteVec}_${eyeOuterGlow}`;
+
         mat.onBeforeCompile = (shader) => {
           shader.vertexShader = `
             varying vec3 vBellyPos;
             varying vec3 vBellyNorm;
+            varying vec2 vEyeUv;
             ${shader.vertexShader}
           `.replace(
             '#include <begin_vertex>',
@@ -1132,29 +1150,78 @@ class WizardsChessApp {
             #include <begin_vertex>
             vBellyPos = position;
             vBellyNorm = normal;
+            vEyeUv = uv;
             `
           );
 
           shader.fragmentShader = `
             varying vec3 vBellyPos;
             varying vec3 vBellyNorm;
+            varying vec2 vEyeUv;
             ${shader.fragmentShader}
-          `.replace(
-            '#include <map_fragment>',
-            `
-            #include <map_fragment>
-            // Dragon King underbelly & chest osteoderm plates mask (further slimmed around core central sternum/belly)
-            float yFactor = smoothstep(0.33, 0.505, vBellyPos.y) * (1.0 - smoothstep(1.248, 1.495, vBellyPos.y));
-            float xFactor = 1.0 - smoothstep(0.08, 0.180, abs(vBellyPos.x));
-            float zFactor = 1.0 - smoothstep(-0.075, 0.075, vBellyPos.z);
-            float normFactor = smoothstep(0.33, -0.14, vBellyNorm.z);
-            float bellyMask = clamp(yFactor * xFactor * zFactor * normFactor, 0.0, 1.0);
+          `
+            .replace(
+              '#include <map_fragment>',
+              `
+              #include <map_fragment>
+              // Great Dragon pear-shaped underbelly -> chest -> throat mask
+              float yFactor = smoothstep(0.32, 0.48, vBellyPos.y) * (1.0 - smoothstep(1.66, 1.77, vBellyPos.y));
+              float bellyHalfW = mix(0.155, 0.068, smoothstep(0.82, 1.72, vBellyPos.y));
+              float xFactor = 1.0 - smoothstep(bellyHalfW * 0.56, bellyHalfW, abs(vBellyPos.x));
+              float zFactor = 1.0 - smoothstep(-0.04, 0.085, vBellyPos.z);
+              float normFactor = smoothstep(0.24, -0.22, vBellyNorm.z);
+              float bellyMask = clamp(yFactor * xFactor * zFactor * normFactor, 0.0, 1.0);
 
-            // Blend underside towards dignified pale-white stone base
-            vec3 bellyWhite = ${bellyWhiteVec};
-            diffuseColor.rgb = mix(diffuseColor.rgb, bellyWhite, bellyMask * 0.90);
-            `
-          );
+              // Blend underside towards dignified pale-white stone base
+              vec3 bellyWhite = ${bellyWhiteVec};
+              diffuseColor.rgb = mix(diffuseColor.rgb, bellyWhite, bellyMask * 0.90);
+
+              ${eyeMaskGlsl}
+              float rawDy = vBellyPos.y - 1.8888;
+              float rawDz = vBellyPos.z + 0.3551;
+              float eDy = (rawDy * 0.94 - rawDz * 0.34) / 0.0205;
+              float eDz = (rawDz * 0.94 + rawDy * 0.34) / 0.0438;
+              float irisCore = 1.0 - smoothstep(0.18, 0.92, length(vec2(eDz * 0.95, eDy * 0.85)));
+              vec3 eyeDiffCol = mix(${eyeOuterDiff}, ${eyeInnerDiff}, irisCore);
+              diffuseColor.rgb = mix(diffuseColor.rgb, eyeDiffCol, eyeMask);
+              `
+            )
+            .replace(
+              '#include <roughnessmap_fragment>',
+              `
+              #include <roughnessmap_fragment>
+              {
+                ${eyeMaskGlsl}
+                roughnessFactor = mix(roughnessFactor, 0.12, eyeMask);
+              }
+              `
+            )
+            .replace(
+              '#include <metalnessmap_fragment>',
+              `
+              #include <metalnessmap_fragment>
+              {
+                ${eyeMaskGlsl}
+                metalnessFactor = mix(metalnessFactor, 0.08, eyeMask);
+              }
+              `
+            )
+            .replace(
+              '#include <emissivemap_fragment>',
+              `
+              #include <emissivemap_fragment>
+              {
+                ${eyeMaskGlsl}
+                float rawDyG = vBellyPos.y - 1.8888;
+                float rawDzG = vBellyPos.z + 0.3551;
+                float eDyG = (rawDyG * 0.94 - rawDzG * 0.34) / 0.0205;
+                float eDzG = (rawDzG * 0.94 + rawDyG * 0.34) / 0.0438;
+                float irisCoreG = 1.0 - smoothstep(0.18, 0.92, length(vec2(eDzG * 0.95, eDyG * 0.85)));
+                vec3 eyeGlowCol = mix(${eyeOuterGlow}, ${eyeInnerGlow}, irisCoreG);
+                totalEmissiveRadiance = mix(totalEmissiveRadiance, eyeGlowCol, eyeMask);
+              }
+              `
+            );
         };
       };
 
@@ -1175,7 +1242,13 @@ class WizardsChessApp {
         emissive: new THREE.Color(0xffb733),
         emissiveIntensity: 0.72
       });
-      applyKingBellyShader(this.materials.kw, 'vec3(0.86, 0.86, 0.88)');
+      applyKingBellyShader(this.materials.kw, 'vec3(0.86, 0.86, 0.88)', {
+        tag: 'kw',
+        outerDiff: 'vec3(0.00, 0.08, 0.42)',
+        innerDiff: 'vec3(0.02, 0.36, 0.90)',
+        outerGlow: 'vec3(0.00, 0.14, 0.85)',
+        innerGlow: 'vec3(0.04, 0.56, 1.35)'
+      });
 
       this.materials.kb = new THREE.MeshStandardMaterial({
         name: 'BlackKingGoldDragon2KPBR',
@@ -1193,7 +1266,13 @@ class WizardsChessApp {
         emissive: new THREE.Color(0xff6a20),
         emissiveIntensity: 0.85
       });
-      applyKingBellyShader(this.materials.kb, 'vec3(0.72, 0.73, 0.76)');
+      applyKingBellyShader(this.materials.kb, 'vec3(0.72, 0.73, 0.76)', {
+        tag: 'kb',
+        outerDiff: 'vec3(0.45, 0.01, 0.02)',
+        innerDiff: 'vec3(0.88, 0.08, 0.02)',
+        outerGlow: 'vec3(0.88, 0.01, 0.02)',
+        innerGlow: 'vec3(1.40, 0.18, 0.02)'
+      });
 
       this.materials.tileLight = new THREE.MeshStandardMaterial({
         name: 'DragonSanctumStone2KPBR',
