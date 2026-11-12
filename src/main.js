@@ -2718,15 +2718,19 @@ class WizardsChessApp {
     const isMobileView = () => window.innerWidth <= 960;
     const leftPanel = document.getElementById('left-panel');
     const rightPanel = document.getElementById('right-panel');
+    const supportMenu = document.getElementById('mobile-support-menu');
     const drawerBackdrop = document.getElementById('mobile-drawer-backdrop');
     const mobileLeftBtn = document.getElementById('btn-mobile-left');
+    const mobileSupportBtn = document.getElementById('btn-mobile-support');
     const mobileRightBtn = document.getElementById('btn-mobile-right');
 
     const closeMobileDrawers = () => {
       leftPanel?.classList.remove('mobile-open');
       rightPanel?.classList.remove('mobile-open');
+      supportMenu?.classList.add('hidden');
       drawerBackdrop?.classList.add('hidden');
       mobileLeftBtn?.classList.remove('active');
+      mobileSupportBtn?.classList.remove('active');
       mobileRightBtn?.classList.remove('active');
     };
     this._closeMobileDrawers = closeMobileDrawers;
@@ -2741,6 +2745,8 @@ class WizardsChessApp {
       const willOpen = !targetPanel.classList.contains('mobile-open');
       otherPanel?.classList.remove('mobile-open');
       otherBtn?.classList.remove('active');
+      supportMenu?.classList.add('hidden');
+      mobileSupportBtn?.classList.remove('active');
 
       if (willOpen) {
         targetPanel.classList.add('mobile-open');
@@ -2753,17 +2759,40 @@ class WizardsChessApp {
       }
     };
 
+    const toggleMobileSupport = () => {
+      if (!supportMenu) return;
+      const willOpen = supportMenu.classList.contains('hidden');
+      leftPanel?.classList.remove('mobile-open');
+      rightPanel?.classList.remove('mobile-open');
+      mobileLeftBtn?.classList.remove('active');
+      mobileRightBtn?.classList.remove('active');
+
+      if (willOpen) {
+        supportMenu.classList.remove('hidden');
+        mobileSupportBtn?.classList.add('active');
+        drawerBackdrop?.classList.remove('hidden');
+      } else {
+        supportMenu.classList.add('hidden');
+        mobileSupportBtn?.classList.remove('active');
+        drawerBackdrop?.classList.add('hidden');
+      }
+    };
+
     mobileLeftBtn?.addEventListener('click', () => toggleMobileDrawer('left'));
+    mobileSupportBtn?.addEventListener('click', toggleMobileSupport);
     mobileRightBtn?.addEventListener('click', () => toggleMobileDrawer('right'));
     drawerBackdrop?.addEventListener('click', closeMobileDrawers);
+    document.getElementById('btn-mobile-support-close')?.addEventListener('click', closeMobileDrawers);
     document.querySelectorAll('[data-close-drawer]').forEach((btn) => {
       btn.addEventListener('click', closeMobileDrawers);
     });
 
     document.getElementById('btn-mobile-undo')?.addEventListener('click', () => {
+      closeMobileDrawers();
       document.getElementById('btn-undo')?.click();
     });
     document.getElementById('btn-mobile-hint')?.addEventListener('click', () => {
+      closeMobileDrawers();
       document.getElementById('btn-hint')?.click();
     });
 
@@ -3052,11 +3081,6 @@ class WizardsChessApp {
           toast.textContent = `🔮 聖堂の神託: ${PIECE_INFO[best.piece].shortName}を ${best.from.toUpperCase()} から ${best.to.toUpperCase()} へ (${best.san})`;
         }
       }
-    });
-
-    document.getElementById('btn-cataclysm-demo')?.addEventListener('click', () => {
-      if (isMobileView()) closeMobileDrawers();
-      this.triggerCataclysm();
     });
 
     document.getElementById('btn-clear-debris')?.addEventListener('click', () => {

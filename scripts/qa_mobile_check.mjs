@@ -104,7 +104,10 @@ async function run() {
   }));
   console.log('After Backdrop Close State:', closedState);
 
-  // Test Hint from mobile dock
+  // Open Battle Support menu from mobile dock and trigger Hint
+  await mobilePage.click('#btn-mobile-support');
+  await mobilePage.waitForTimeout(250);
+  await mobilePage.screenshot({ path: path.join(artifactsDir, 'qa_mobile_support_menu.png') });
   await mobilePage.click('#btn-mobile-hint');
   await mobilePage.waitForTimeout(300);
   const hintToast = await mobilePage.textContent('#status-toast');

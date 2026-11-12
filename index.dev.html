@@ -403,6 +403,17 @@
       </div>
 
 
+      <!-- Battle Support (Undo & Oracle Hint) -->
+      <div class="panel-section support-section" id="battle-support-section">
+        <div class="section-header">
+          <h2>🛡️ 対戦サポート</h2>
+        </div>
+        <div class="support-buttons-grid">
+          <button id="btn-undo" class="gothic-btn" title="直前の手を取り消して戻します（対AI戦では自分の手番まで戻ります）">↩️ 待った</button>
+          <button id="btn-hint" class="gothic-btn" title="AIが現在の局面からおすすめの最善手候補を紫色で表示します">🔮 神託</button>
+        </div>
+      </div>
+
       <!-- Sanctum Battle Scenarios & Actions -->
       <div class="panel-section actions-section">
         <div class="section-header">
@@ -419,12 +430,7 @@
             🔥 竜炎ブレス＆石砕デモ (Dragon Clash)
           </button>
           <button id="btn-new-game" class="gothic-btn">🔄 儀式を再開</button>
-          <button id="btn-undo" class="gothic-btn">↩️ 時を戻す</button>
-          <button id="btn-hint" class="gothic-btn">🔮 古竜の神託</button>
           <button id="btn-clear-debris" class="gothic-btn">🧹 砕石を浄化</button>
-          <button id="btn-cataclysm-demo" class="gothic-btn full-width" style="grid-column: span 2; margin-top: 4px; border-color: rgba(255, 68, 0, 0.65); color: #ff7744;" title="聖域の魔力暴走による外周マス崩落ギミックを発動">
-            🌋 聖域崩落を発動 (Cataclysm)
-          </button>
         </div>
       </div>
 
@@ -432,10 +438,27 @@
 
     <!-- Bottom Center Status / Coordinate Toast -->
     <footer class="bottom-hud">
+      <!-- Mobile Battle Support Menu -->
+      <div id="mobile-support-menu" class="mobile-support-menu gothic-stone-panel hidden" role="dialog" aria-label="対戦サポート">
+        <div class="mobile-support-header">
+          <span>🛡️ 対戦サポート</span>
+          <button type="button" class="gothic-btn mobile-close-btn" id="btn-mobile-support-close">✕ 閉じる</button>
+        </div>
+        <div class="mobile-support-actions">
+          <button type="button" id="btn-mobile-undo" class="gothic-btn mobile-support-item">
+            <span class="support-item-title">↩️ 待った</span>
+            <span class="support-item-desc">直前の手を取り消して戻す</span>
+          </button>
+          <button type="button" id="btn-mobile-hint" class="gothic-btn mobile-support-item">
+            <span class="support-item-title">🔮 神託</span>
+            <span class="support-item-desc">AIが最善手候補を紫で表示</span>
+          </button>
+        </div>
+      </div>
+
       <div class="mobile-dock" id="mobile-dock">
         <button type="button" id="btn-mobile-left" class="gothic-btn mobile-dock-btn">📜 戦況・記録</button>
-        <button type="button" id="btn-mobile-undo" class="gothic-btn mobile-dock-btn">↩️ 待った</button>
-        <button type="button" id="btn-mobile-hint" class="gothic-btn mobile-dock-btn">🔮 神託</button>
+        <button type="button" id="btn-mobile-support" class="gothic-btn mobile-dock-btn">🛡️ 対戦サポート</button>
         <button type="button" id="btn-mobile-right" class="gothic-btn gold-btn mobile-dock-btn">⚙️ 設定・視点</button>
       </div>
       <div class="status-pill gothic-stone-panel" id="status-toast">
